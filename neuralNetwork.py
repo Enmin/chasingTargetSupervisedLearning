@@ -49,8 +49,12 @@ class GeneratePolicyNet:
 		with tf.name_scope("outputs"):
 			actionDistribution_ = tf.nn.softmax(allActionActivation_, name='actionDistribution_')
 			cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=actionDistribution_, labels=actionLabel_, name='cross_entropy')
+			actionDistributionIndex = tf.argmax(actionDistribution_, axis=1)
+			actionLabelIndex = tf.argmax(actionLabel_, axis=1)
+			accuracy = tf.reduce_mean(tf.cast(tf.equal(actionDistributionIndex, actionLabelIndex), tf.float32))
 			loss_ = tf.reduce_mean(cross_entropy, name='loss_')
 			tf.summary.scalar("loss", loss_)
+			tf.summary.scalar("accuracy", accuracy)
 
 		with tf.name_scope("train"):
 			optimizer = tf.train.AdamOptimizer(self.learningRate, name='adamOpt_')
