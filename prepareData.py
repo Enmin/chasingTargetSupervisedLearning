@@ -1,6 +1,51 @@
 import numpy as np
 import pickle
 import random
+from AnalyticGeometryFunctions import computeAngleBetweenVectors
+
+
+def getOptimalAction(agentState, targetState, actionSpace):
+	relativeVector = np.array(targetState) - np.array(agentState)
+	angleBetweenVectors = {computeAngleBetweenVectors(relativeVector, action): action for action in np.array(actionSpace)}
+	optimalAction = angleBetweenVectors[min(angleBetweenVectors.keys())]
+	return optimalAction
+
+
+def generateOptimalPolicy(stateSpace, actionSpace):
+	optimalPolicy = {(agentState + targetState): getOptimalAction(agentState, targetState, actionSpace) for agentState, targetState in stateSpace}
+	return optimalPolicy
+
+
+class SampleTrajectory():
+	def __init__(self, maxTimeStep, transitionFunction, isTerminal, actionSpace, agentStateSpace, targetStateSpace):
+		self.maxTimeStep = maxTimeStep
+		self.transitionFunction = transitionFunction
+		self.isTerminal = isTerminal
+		self.actionSpace = actionSpace
+		self.agentStateSpace = agentStateSpace
+		self.targetStateSpace = targetStateSpace
+
+	def __call__(self, policy):
+		initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
+		targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
+		# print('AgentState: {}'.format(initialAgentState))
+		# print('TargetState: {}'.format(targetPosition))
+		isTerminal = self.isTerminal
+		while isTerminal(initialAgentState, targetPosition):
+			initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
+			targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
+		oldState, action = initialAgentState, [0, 0]
+		trajectory = []
+
+		for time in range(self.maxTimeStep):
+			action = policy[oldState + targetPosition]
+			newState = self.transitionFunction(oldState, action)
+			terminal = self.isTerminal(oldState, targetPosition)
+			if terminal:
+				break
+			trajectory.append((list(oldState + targetPosition), action))
+			oldState = newState
+		return zip(*trajectory)
 
 
 def generateData(sampleTrajectory, policy, trajNumber, path, actionSpace):
@@ -9,12 +54,11 @@ def generateData(sampleTrajectory, policy, trajNumber, path, actionSpace):
 	for index in range(trajNumber):
 		states, actions = sampleTrajectory(policy)
 		totalStateBatch.append(np.array(states))
-		oneHotAction = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
+		oneHotAction = np.array([[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions])
 		totalActionBatch.append(oneHotAction)
 	dataSet = list(zip(totalStateBatch, totalActionBatch))
 	saveFile = open(path, "wb")
 	pickle.dump(dataSet, saveFile)
-	return
 
 
 def loadData(path):
@@ -26,8 +70,14 @@ def loadData(path):
 
 def sampleData(data, batchSize):
 	batch = random.sample(data, batchSize)
+	totalBatchInput = []
+	totalBatchOutput = []
 	batchInput = [x for x, _ in batch]
 	batchOutput = [y for _, y in batch]
-	print(batchInput)
-	print(batchOutput)
-	return batchInput, batchOutput
+	for input in batchInput:
+		for individualState in input:
+			totalBatchInput.append(np.array(individualState))
+	for output in batchOutput:
+		for individualAction in output:
+			totalBatchOutput.append(np.array(individualAction))
+	return totalBatchInput, totalBatchOutput

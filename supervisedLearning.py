@@ -1,76 +1,90 @@
+import tensorflow as tf
 import numpy as np
-from AnalyticGeometryFunctions import computeAngleBetweenVectors
-import gridEnv
 
 
-def getOptimalAction(agentState, targetState, actionSpace):
-	relativeVector = np.array(targetState) - np.array(agentState)
-	angleBetweenVectors = {computeAngleBetweenVectors(relativeVector, action): action for action in np.array(actionSpace)}
-	optimalAction = angleBetweenVectors[min(angleBetweenVectors.keys())]
-	return optimalAction
+def train(stepNum, trainingData, model, summaryOn=True):
+    stateBatch, actionLabelBatch = trainingData
+    graph = model.graph
+    state_, actionLabel_ = graph.get_collection_ref("inputs")
+    loss_ = graph.get_collection_ref("loss")[0]
+    accuracy_ = graph.get_collection_ref("accuracy")[0]
+    trainOp = graph.get_collection_ref(tf.GraphKeys.TRAIN_OP)[0]
+    fullSummaryOp = graph.get_collection_ref('summaryOps')[0]
+    trainWriter = graph.get_collection_ref('writers')[0]
+
+    if summaryOn:
+        loss, accuracy, _, fullSummary = model.run([loss_, accuracy_, trainOp, fullSummaryOp],
+                                                   feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch})
+        trainWriter.add_summary(fullSummary, stepNum)
+    else:
+        loss, accuracy, _ = model.run([loss_, accuracy_, trainOp],
+                                      feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch})
+    return model, loss, accuracy
 
 
-def generateOptimalPolicy(stateSpace, actionSpace):
-	optimalPolicy = {(agentState + targetState): getOptimalAction(agentState, targetState, actionSpace) for agentState, targetState in stateSpace}
-	return optimalPolicy
+class Evaluate:
+    def __init__(self, testData):
+        self.testData = testData
+
+    def __call__(self, stepNum, model, summaryOn=True):
+        stateBatch, actionLabelBatch = self.testData
+
+        graph = model.graph
+        state_, actionLabel_ = graph.get_collection_ref("inputs")
+        loss_ = graph.get_collection_ref("loss")[0]
+        accuracy_ = graph.get_collection_ref("accuracy")[0]
+        evalSummaryOp = graph.get_collection_ref('summaryOps')[1]
+        testWriter = graph.get_collection_ref('writers')[1]
+
+        if summaryOn:
+            loss, accuracy, evalSummary = model.run([loss_, accuracy_, evalSummaryOp],
+                                                    feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch})
+            testWriter.add_summary(evalSummary, stepNum)
+        else:
+            loss, accuracy = model.run([loss_, accuracy_],
+                                       feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch})
+        return loss, accuracy
 
 
-class ApproximatePolicy():
-	def __init__(self, actionSpace):
-		self.actionSpace = actionSpace
-		self.numActionSpace = len(self.actionSpace)
-	def __call__(self, stateBatch, model):
-		graph = model.graph
-		state_ = graph.get_tensor_by_name('inputs/state_:0')
-		actionDistribution_ = graph.get_tensor_by_name('outputs/actionDistribution_:0')
-		actionDistributionBatch = model.run(actionDistribution_, feed_dict = {state_ : stateBatch})
-		# print(stateBatch)
-		actionIndexBatch = [np.random.choice(range(self.numActionSpace), p = actionDistribution) for actionDistribution in actionDistributionBatch]
-		actionBatch = np.array([self.actionSpace[actionIndex] for actionIndex in actionIndexBatch])
-		# print(actionBatch)
-		return actionBatch
+class Learn:
+    def __init__(self,
+                 maxStepNum, learningRate, lossChangeThreshold,
+                 trainingData, testData,
+                 summaryOn, reportInterval):
+        self.maxStepNum = maxStepNum
+        self.learningRate = learningRate
+        self.lossChangeThreshold = lossChangeThreshold
 
+        self.trainingData = trainingData
+        self.evaluateOnTrainingData = Evaluate(trainingData)
+        self.evaluate = Evaluate(testData)
 
-class SampleTrajectory():
-	def __init__(self, maxTimeStep, transitionFunction, isTerminal, actionSpace, agentStateSpace, targetStateSpace):
-		self.maxTimeStep = maxTimeStep
-		self.transitionFunction = transitionFunction
-		self.isTerminal = isTerminal
-		self.actionSpace = actionSpace
-		self.agentStateSpace = agentStateSpace
-		self.targetStateSpace = targetStateSpace
+        self.summaryOn = summaryOn
+        self.reportInterval = reportInterval
 
-	def __call__(self, policy):
-		initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
-		targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
-		# print('AgentState: {}'.format(initialAgentState))
-		# print('TargetState: {}'.format(targetPosition))
-		isTerminal = self.isTerminal
-		while isTerminal(initialAgentState, targetPosition):
-			initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
-			targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
-		oldState, action = initialAgentState, [0, 0]
-		trajectory = []
+    def __call__(self, model):
+        lossHistorySize = 5
+        lossHistory = np.ones(lossHistorySize)
+        terminalCond = False
 
-		for time in range(self.maxTimeStep):
-			action = policy[oldState + targetPosition]
-			newState = self.transitionFunction(oldState, action)
-			terminal = self.isTerminal(oldState, targetPosition)
-			if terminal:
-				break
-			trajectory.append((list(oldState + targetPosition), action))
-			oldState = newState
-		return zip(*trajectory)
+        for stepNum in range(self.maxStepNum):
+            if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1 or terminalCond):
+                newModel, trainLoss, _ = train(stepNum, self.trainingData, model, summaryOn=True)
+                _, _ = self.evaluate(stepNum, model, summaryOn=True)
+            else:
+                newModel, trainLoss, _ = train(stepNum, self.trainingData, model, summaryOn=False)
+            model = newModel
 
+            if stepNum % self.reportInterval == 0:
+                print("#{} loss: {}".format(stepNum, trainLoss))
 
-def sampleTotalTrajectory(sampleTrajectory, agentStatesSpace, targetStatesSpace):
-	initialAgentState = agentStatesSpace[np.random.randint(0, len(agentStatesSpace))]
-	targetPosition = targetStatesSpace[np.random.randint(0, len(targetStatesSpace))]
-	# print('AgentState: {}'.format(initialAgentState))
-	# print('TargetState: {}'.format(targetPosition))
-	isTerminal = gridEnv.IsTerminal()
-	while isTerminal(initialAgentState, targetPosition):
-		initialAgentState = agentStatesSpace[np.random.randint(0, len(agentStatesSpace))]
-		targetPosition = targetStatesSpace[np.random.randint(0, len(targetStatesSpace))]
-	stateBatch, actionBatch = sampleTrajectory(None, initialAgentState, targetPosition)
-	return stateBatch, actionBatch
+            if terminalCond:
+                break
+
+            lossHistory[stepNum % lossHistorySize] = trainLoss
+            terminalCond = bool(np.std(lossHistory) < 1e-8)
+
+        trainLoss, trainAccuracy = self.evaluateOnTrainingData(stepNum, newModel, summaryOn=False)
+        testLoss, testAccuracy = self.evaluate(stepNum, newModel, summaryOn=False)
+
+        return newModel, trainLoss, trainAccuracy, testLoss, testAccuracy
