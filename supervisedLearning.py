@@ -1,8 +1,6 @@
-import itertools as it
 import numpy as np
 from AnalyticGeometryFunctions import computeAngleBetweenVectors
 import gridEnv
-import neuralNetwork
 
 
 def getOptimalAction(agentState, targetState, actionSpace):
@@ -13,7 +11,7 @@ def getOptimalAction(agentState, targetState, actionSpace):
 
 
 def generateOptimalPolicy(stateSpace, actionSpace):
-	optimalPolicy = {(agentState, targetState): getOptimalAction(agentState, targetState, actionSpace) for agentState, targetState in stateSpace}
+	optimalPolicy = {(agentState + targetState): getOptimalAction(agentState, targetState, actionSpace) for agentState, targetState in stateSpace}
 	return optimalPolicy
 
 
@@ -34,22 +32,28 @@ class ApproximatePolicy():
 
 
 class SampleTrajectory():
-	def __init__(self, maxTimeStep, transitionFunction, isTerminal, actionSpace, optimalPolicy):
+	def __init__(self, maxTimeStep, transitionFunction, isTerminal, actionSpace, agentStateSpace, targetStateSpace):
 		self.maxTimeStep = maxTimeStep
 		self.transitionFunction = transitionFunction
 		self.isTerminal = isTerminal
 		self.actionSpace = actionSpace
-		self.optimalPolicy = optimalPolicy
+		self.agentStateSpace = agentStateSpace
+		self.targetStateSpace = targetStateSpace
 
-	def __call__(self, actor, initialAgentState, targetPosition):
+	def __call__(self, policy):
+		initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
+		targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
+		# print('AgentState: {}'.format(initialAgentState))
+		# print('TargetState: {}'.format(targetPosition))
+		isTerminal = self.isTerminal
+		while isTerminal(initialAgentState, targetPosition):
+			initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
+			targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
 		oldState, action = initialAgentState, [0, 0]
 		trajectory = []
 
 		for time in range(self.maxTimeStep):
-			if actor is None:
-				action = list(self.optimalPolicy[(oldState, targetPosition)])
-			else:
-				action = actor([list(oldState + targetPosition)])[0]
+			action = policy[oldState + targetPosition]
 			newState = self.transitionFunction(oldState, action)
 			terminal = self.isTerminal(oldState, targetPosition)
 			if terminal:
