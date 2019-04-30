@@ -53,9 +53,9 @@ def generateData(sampleTrajectory, policy, trajNumber, path, actionSpace):
 	totalActionBatch = []
 	for index in range(trajNumber):
 		states, actions = sampleTrajectory(policy)
-		totalStateBatch.append(np.array(states))
-		oneHotAction = np.array([[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions])
-		totalActionBatch.append(oneHotAction)
+		totalStateBatch = totalStateBatch + list(states)
+		oneHotAction = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
+		totalActionBatch = totalActionBatch + oneHotAction
 	dataSet = list(zip(totalStateBatch, totalActionBatch))
 	saveFile = open(path, "wb")
 	pickle.dump(dataSet, saveFile)
@@ -70,14 +70,6 @@ def loadData(path):
 
 def sampleData(data, batchSize):
 	batch = random.sample(data, batchSize)
-	totalBatchInput = []
-	totalBatchOutput = []
 	batchInput = [x for x, _ in batch]
 	batchOutput = [y for _, y in batch]
-	for input in batchInput:
-		for individualState in input:
-			totalBatchInput.append(np.array(individualState))
-	for output in batchOutput:
-		for individualAction in output:
-			totalBatchOutput.append(np.array(individualAction))
-	return totalBatchInput, totalBatchOutput
+	return batchInput, batchOutput

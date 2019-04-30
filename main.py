@@ -25,10 +25,12 @@ if __name__ == '__main__':
 	maxTimeStep = int(gridSize * gridSize / 2)
 	sampleTrajectory = PD.SampleTrajectory(maxTimeStep, transitionFunction, isTerminal, actionSpace, agentStates, targetStates)
 
-	dataNum = 2000
+	trajNum = 20000
 	dataSetPath = "data.pkl"
-	# PD.generateData(sampleTrajectory, optimalPolicy, dataNum, dataSetPath, actionSpace)
+	# PD.generateData(sampleTrajectory, optimalPolicy, trajNum, dataSetPath, actionSpace)
 	dataSet = PD.loadData(dataSetPath)
+
+	dataNum = 94214
 
 	learningRate = 0.01
 	generatePolicyNet = NN.GeneratePolicyNet(4, 8, learningRate)
@@ -36,12 +38,11 @@ if __name__ == '__main__':
 
 	maxTrainSize = int(dataNum / 2)
 	maxTestSize = int(dataNum / 2)
-	trainStateBatch, trainActionBatch = PD.sampleData(dataSet, maxTrainSize)
-	testStateBatch, testActionBatch = PD.sampleData(dataSet, maxTestSize)
-
 	maxEpisode = 10000
 	summaryPeriod = 500
 	lossChangeThresHold = 1e-6
+	trainStateBatch, trainActionBatch = PD.sampleData(dataSet, maxTrainSize)
+	testStateBatch, testActionBatch = PD.sampleData(dataSet, maxTestSize)
 	learn = SL.Learn(maxEpisode, learningRate, lossChangeThresHold, (trainStateBatch, trainActionBatch), (testStateBatch, testActionBatch), False, summaryPeriod)
 	newModel, trainLoss, trainAccuracy, testLoss, testAccuracy = learn(model)
 	print("trainLoss: {} trainAccuracy: {}\n testLoss: {} testAccuracy: {}".format(trainLoss, trainAccuracy, testLoss, testAccuracy))
