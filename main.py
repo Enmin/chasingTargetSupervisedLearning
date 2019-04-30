@@ -30,8 +30,6 @@ if __name__ == '__main__':
 	#PD.generateData(sampleTrajectory, optimalPolicy, trajNum, dataSetPath, actionSpace)
 	dataSet = PD.loadData(dataSetPath)
 
-	dataNum = 94214
-
 	learningRate = 0.001
 	generatePolicyNet = NN.GeneratePolicyNet(4, 8, learningRate)
 	model = generatePolicyNet(3, 32)
@@ -45,7 +43,7 @@ if __name__ == '__main__':
 	summaryPeriod = 500
 	lossChangeThreshold = 1e-6
 	for trainingData in trainingDataList:
-		print("----tranining data size = {}----".format(len(trainingData[0])))
+		print("----training data size = {}----".format(len(trainingData[0])))
 		learn = SL.Learn(maxEpisode, learningRate, lossChangeThreshold, trainingData, testData, False, summaryPeriod)
 		newModel, trainLoss, trainAccuracy, testLoss, testAccuracy = learn(model)
 		print("trainLoss: {} trainAccuracy: {}\n testLoss: {} testAccuracy: {}".format(trainLoss, trainAccuracy, testLoss, testAccuracy))
