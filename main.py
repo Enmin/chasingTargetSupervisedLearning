@@ -6,6 +6,7 @@ import neuralNetwork as NN
 import gridEnv as GE
 import prepareData as PD
 
+
 if __name__ == '__main__':
 	np.random.seed(128)
 	tf.set_random_seed(128)
@@ -30,20 +31,25 @@ if __name__ == '__main__':
 	#PD.generateData(sampleTrajectory, optimalPolicy, trajNum, dataSetPath, actionSpace)
 	dataSet = PD.loadData(dataSetPath)
 
+	conditionNum = 11
+
 	learningRate = 0.001
 	generatePolicyNet = NN.GeneratePolicyNet(4, 8, learningRate)
-	model = generatePolicyNet(3, 32)
+	models = [generatePolicyNet(3, 32) for _ in range(conditionNum)]
 
-	trainDataSizes = [1000, 2000, 5000, 10000, 15000]
-	trainingDataList = [PD.sampleData(dataSet, size) for size in trainDataSizes]
+	trainingDataSizes = [20*(2**i) for i in range(conditionNum)]
+	trainingDataList = [PD.sampleData(dataSet, size) for size in trainingDataSizes]
 	testDataSize = 5000
 	testData = PD.sampleData(dataSet, testDataSize)
 
-	maxEpisode = 5000
-	summaryPeriod = 500
-	lossChangeThreshold = 1e-6
-	for trainingData in trainingDataList:
-		print("----training data size = {}----".format(len(trainingData[0])))
-		learn = SL.Learn(maxEpisode, learningRate, lossChangeThreshold, trainingData, testData, False, summaryPeriod)
-		newModel, trainLoss, trainAccuracy, testLoss, testAccuracy = learn(model)
-		print("trainLoss: {} trainAccuracy: {}\n testLoss: {} testAccuracy: {}".format(trainLoss, trainAccuracy, testLoss, testAccuracy))
+	maxStepNum = 5000
+	reportInterval = 500
+	lossChangeThreshold = 1e-8
+	lossHistorySize = 10
+	train = SL.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
+					 summaryOn=False, testData=None)
+
+	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
+	evalResults = [(SL.evaluate(model, trainingData), SL.evaluate(model, testData)) for trainingData, model in zip(trainingDataList, trainedModels)]
+
+	print(evalResults)
