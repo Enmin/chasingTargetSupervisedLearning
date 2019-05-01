@@ -17,23 +17,19 @@ def generateOptimalPolicy(stateSpace, actionSpace):
 
 
 class SampleTrajectory():
-	def __init__(self, maxTimeStep, transitionFunction, isTerminal, actionSpace, agentStateSpace, targetStateSpace):
+	def __init__(self, maxTimeStep, transitionFunction, isTerminal, reset):
 		self.maxTimeStep = maxTimeStep
 		self.transitionFunction = transitionFunction
 		self.isTerminal = isTerminal
-		self.actionSpace = actionSpace
-		self.agentStateSpace = agentStateSpace
-		self.targetStateSpace = targetStateSpace
+		self.reset = reset
 
 	def __call__(self, policy):
-		initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
-		targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
+		initialAgentState, targetPosition = self.reset()
 		# print('AgentState: {}'.format(initialAgentState))
 		# print('TargetState: {}'.format(targetPosition))
 		isTerminal = self.isTerminal
 		while isTerminal(initialAgentState, targetPosition):
-			initialAgentState = self.agentStateSpace[np.random.randint(0, len(self.agentStateSpace))]
-			targetPosition = self.targetStateSpace[np.random.randint(0, len(self.targetStateSpace))]
+			initialAgentState, targetPosition = self.reset()
 		oldState, action = initialAgentState, [0, 0]
 		trajectory = []
 
