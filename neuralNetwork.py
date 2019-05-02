@@ -20,9 +20,10 @@ class GeneratePolicyNet:
 				tf.add_to_collection("inputs", actionLabel_)
 
 			with tf.name_scope("hidden"):
-				# initWeight = tf.random_uniform_initializer(-0.03, 0.03)
-				# initBias = tf.constant_initializer(0.001)
-				fc1 = tf.layers.Dense(units=hiddenWidth, activation=tf.nn.relu)
+				initWeight = tf.random_uniform_initializer(-0.03, 0.03)
+				initBias = tf.constant_initializer(0.001)
+
+				fc1 = tf.layers.Dense(units=hiddenWidth, activation=tf.nn.relu, kernel_initializer=initWeight, bias_initializer=initBias)
 				a1_ = fc1(state_)
 				w1_, b1_ = fc1.weights
 				tf.summary.histogram("w1", w1_)
@@ -31,7 +32,7 @@ class GeneratePolicyNet:
 
 				a_ = a1_
 				for i in range(2, hiddenDepth+1):
-					fc = tf.layers.Dense(units=hiddenWidth, activation=tf.nn.relu)
+					fc = tf.layers.Dense(units=hiddenWidth, activation=tf.nn.relu, kernel_initializer=initWeight, bias_initializer=initBias)
 					aNext_ = fc(a_)
 					a_ = aNext_
 					w_, b_ = fc.weights
@@ -39,7 +40,7 @@ class GeneratePolicyNet:
 					tf.summary.histogram("b{}".format(i), b_)
 					tf.summary.histogram("a{}".format(i), a_)
 
-				fcLast = tf.layers.Dense(units=self.numActionSpace, activation=None)
+				fcLast = tf.layers.Dense(units=self.numActionSpace, activation=None, kernel_initializer=initWeight, bias_initializer=initBias)
 				allActionActivation_ = fcLast(a_)
 				wLast_, bLast_ = fcLast.weights
 				tf.summary.histogram("wLast", wLast_)
