@@ -44,7 +44,8 @@ if __name__ == '__main__':
 	testData = PD.sampleData(dataSet, testDataSize)
 
 	learningRate = 0.001
-	generatePolicyNet = NN.GeneratePolicyNet(4, 8, learningRate)
+	regularizationFactor = 0
+	generatePolicyNet = NN.GeneratePolicyNet(4, 8, learningRate, regularizationFactor)
 	models = [generatePolicyNet(3, 32) for _ in range(len(trainingDataSizes))]
 
 	maxStepNum = 50000

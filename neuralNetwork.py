@@ -2,10 +2,11 @@ import tensorflow as tf
 
 
 class GeneratePolicyNet:
-	def __init__(self, numStateSpace, numActionSpace, learningRate):
+	def __init__(self, numStateSpace, numActionSpace, learningRate, regularizationFactor):
 		self.numStateSpace = numStateSpace
 		self.numActionSpace = numActionSpace
 		self.learningRate = learningRate
+		self.regularizationFactor = regularizationFactor
 
 	def __call__(self, hiddenDepth, hiddenWidth):
 		tf.set_random_seed(128)
@@ -62,8 +63,10 @@ class GeneratePolicyNet:
 				accuracySummary = tf.summary.scalar("accuracy", accuracy_)
 
 			with tf.name_scope("train"):
+				l2RegularizationLoss_ = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.regularizationFactor
+
 				optimizer = tf.train.AdamOptimizer(self.learningRate, name='adamOpt_')
-				gradVarPairs_ = optimizer.compute_gradients(loss_)
+				gradVarPairs_ = optimizer.compute_gradients(loss_ + l2RegularizationLoss_)
 				trainOp = optimizer.apply_gradients(gradVarPairs_)
 				tf.add_to_collection(tf.GraphKeys.TRAIN_OP, trainOp)
 
