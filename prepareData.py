@@ -55,6 +55,7 @@ def generateData(sampleTrajectory, policy, trajNumber, path, actionSpace):
 	dataSet = list(zip(totalStateBatch, totalActionBatch))
 	saveFile = open(path, "wb")
 	pickle.dump(dataSet, saveFile)
+	saveFile.close()
 
 
 def loadData(path):
