@@ -176,5 +176,5 @@ def approximatePolicy(stateBatch, policyNet, actionSpace):
 	actionIndices = policyNet.run(actionIndices_, feed_dict={state_: stateBatch})
 	actionBatch = [actionSpace[i] for i in actionIndices]
 	if len(actionBatch) == 1:
-		actionBatch = actionBatch[0][0]
+		actionBatch = actionBatch[0]
 	return actionBatch
