@@ -60,7 +60,7 @@ class GenerateModel:
 				actionIndices_ = tf.argmax(actionDistribution_, axis=1)
 				actionLabelIndices_ = tf.argmax(actionLabel_, axis=1)
 				accuracy_ = tf.reduce_mean(tf.cast(tf.equal(actionIndices_, actionLabelIndices_), tf.float32))
-				tf.add_to_summary("actionIndices", actionIndices_)
+				tf.add_to_collection("actionIndices", actionIndices_)
 				tf.add_to_collection("accuracy", accuracy_)
 				accuracySummary = tf.summary.scalar("accuracy", accuracy_)
 
@@ -168,9 +168,13 @@ def evaluate(model, testData, summaryOn=False, stepNum=None):
 
 
 def approximatePolicy(stateBatch, policyNet, actionSpace):
+	if np.array(stateBatch).ndim == 1:
+		stateBatch = np.array([stateBatch])
 	graph = policyNet.graph
 	state_ = graph.get_collection_ref("inputs")[0]
 	actionIndices_ = graph.get_collection_ref("actionIndices")[0]
 	actionIndices = policyNet.run(actionIndices_, feed_dict={state_: stateBatch})
-	actions = [actionSpace[i] for i in actionIndices]
-	return actions
+	actionBatch = [actionSpace[i] for i in actionIndices]
+	if len(actionBatch) == 1:
+		actionBatch = actionBatch[0][0]
+	return actionBatch
