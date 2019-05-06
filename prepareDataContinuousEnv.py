@@ -18,7 +18,7 @@ class OptimalPolicy:
 		return action
 
 
-class SampleTrajectory():
+class SampleTrajectory:
 	def __init__(self, maxTimeStep, transitionFunction, isTerminal, reset):
 		self.maxTimeStep = maxTimeStep
 		self.transitionFunction = transitionFunction
@@ -40,10 +40,11 @@ class SampleTrajectory():
 		return trajectory
 
 
-def generateData(sampleTrajectory, policy, trajNumber, path, actionSpace):
+def generateData(sampleTrajectory, policy, actionSpace, trajNumber, path):
 	totalStateBatch = []
 	totalActionBatch = []
 	for index in range(trajNumber):
+		if index % 100 == 0: print(index)
 		trajectory = sampleTrajectory(policy)
 		states, actions = zip(*trajectory)
 		totalStateBatch = totalStateBatch + list(states)
@@ -68,36 +69,27 @@ def sampleData(data, batchSize):
 	return batchInput, batchOutput
 
 
-class SampleByStep():
-	def __init__(self, maxTimeStep, transitionFunction):
-		self.maxTimeStep = maxTimeStep
-		self.transitionFunction = transitionFunction
+def prepareDataContinuousEnv():
+	actionSpace = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
+	policy = OptimalPolicy(actionSpace)
 
-	def __call__(self, policy, state):
-		trajectory = []
-		for _ in range(self.maxTimeStep):
-			action = policy(state)
-			newState = self.transitionFunction(state, action)
-			trajectory.append((state, action))
-			state = newState
-			break
-		return trajectory
+	maxTimeStep = 180
+	import continuousEnv
+	xbound = [0, 180]
+	ybound = [0, 180]
+	vel = 1
+	transitionFunction = continuousEnv.TransitionFunction(xbound, ybound, vel)
+	isTerminal = continuousEnv.IsTerminal(1.5*vel)
+	reset = continuousEnv.Reset(xbound, ybound)
+	sampleTraj = SampleTrajectory(maxTimeStep, transitionFunction, isTerminal, reset)
+
+	trajNum = 1200
+	path = "./continuous_data.pkl"
+	generateData(sampleTraj, policy, actionSpace, trajNum, path)
+
+	data = loadData(path)
+	print("{} data points in {}".format(data, path))
 
 
-def generateAllData(sampleByStep, policy, stateSpace, actionSpace):
-	path = "all_data.pkl"
-	totalStateBatch = []
-	totalActionBatch = []
-	for agent, target in stateSpace:
-		if (np.array(agent) == np.array(target)).all():
-			continue
-		trajectory = sampleByStep(policy, agent, target)
-		states, actions = zip(*trajectory)
-		totalStateBatch = totalStateBatch + list(states)
-		oneHotAction = [
-			[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))]
-			for action in actions]
-		totalActionBatch = totalActionBatch + oneHotAction
-	dataSet = list(zip(totalStateBatch, totalActionBatch))
-	saveFile = open(path, "wb")
-	pickle.dump(dataSet, saveFile)
+if __name__ == "__main__":
+	prepareDataContinuousEnv()

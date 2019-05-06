@@ -48,8 +48,7 @@ class IsTerminal():
 
 
 class Reset():
-	def __init__(self, actionSpace, xBoundary, yBoundary):
-		self.actionSpace =   actionSpace
+	def __init__(self, xBoundary, yBoundary):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
 

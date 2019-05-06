@@ -8,7 +8,7 @@ class GeneratePolicyNet:
 		self.learningRate = learningRate
 		self.regularizationFactor = regularizationFactor
 
-	def __call__(self, hiddenDepth, hiddenWidth):
+	def __call__(self, hiddenDepth, hiddenWidth, summaryPath="./tbdata"):
 		tf.set_random_seed(128)
 
 		print("Generating Policy Net with hidden layers: {} x {} = {}".format(hiddenDepth, hiddenWidth, hiddenDepth * hiddenWidth))
@@ -82,8 +82,8 @@ class GeneratePolicyNet:
 			tf.add_to_collection("summaryOps", fullSummary)
 			tf.add_to_collection("summaryOps", evalSummary)
 
-			trainWriter = tf.summary.FileWriter("./tbdata/train", graph=tf.get_default_graph())
-			testWriter = tf.summary.FileWriter("./tbdata/test", graph=tf.get_default_graph())
+			trainWriter = tf.summary.FileWriter(summaryPath + "/train", graph=tf.get_default_graph())
+			testWriter = tf.summary.FileWriter(summaryPath + "/test", graph=tf.get_default_graph())
 			tf.add_to_collection("writers", trainWriter)
 			tf.add_to_collection("writers", testWriter)
 
