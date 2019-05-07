@@ -89,6 +89,9 @@ class GenerateModel:
 			tf.add_to_collection("writers", trainWriter)
 			tf.add_to_collection("writers", testWriter)
 
+			saver = tf.train.Saver()
+			tf.add_to_collection("saver", saver)
+
 			model = tf.Session(graph=graph)
 			model.run(tf.global_variables_initializer())
 
@@ -165,6 +168,21 @@ def evaluate(model, testData, summaryOn=False, stepNum=None):
 		loss, accuracy = model.run([loss_, accuracy_],
                                    feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch})
 	return loss, accuracy
+
+
+def saveVariables(model, path):
+	graph = model.graph
+	saver = graph.get_collection_ref("saver")[0]
+	saver.save(model, path)
+	print("Model saved in {}".format(path))
+
+
+def restoreVariables(model, path):
+	graph = model.graph
+	saver = graph.get_collection_ref("saver")[0]
+	saver.restore(model, path)
+	print("Model restored from {}".format(path))
+	return model
 
 
 def approximatePolicy(stateBatch, policyNet, actionSpace):
