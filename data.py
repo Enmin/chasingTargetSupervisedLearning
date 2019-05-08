@@ -37,29 +37,45 @@ class AccumulateRewards():
 		return accumulatedRewards
 
 
-def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajNumber, path, withReward=True):
+def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajNumber, path, withReward=True,
+				 partialTrajSize=None):
 	totalStateBatch = []
 	totalActionBatch = []
 	totalRewardBatch = []
 	for index in range(trajNumber):
 		if index % 100 == 0: print("{} trajectories generated".format(index))
+
 		trajectory = sampleTrajectory(policy)
+		length = len(trajectory)
+
+		if (partialTrajSize is None) or (partialTrajSize >= length):
+			selectedTimeSteps = list(range(length))
+		else:
+			selectedTimeSteps = random.sample(list(range(length)), partialTrajSize)
+
 		if withReward:
 			accumulatedRewards = accumulateRewards(trajectory)
-			totalRewardBatch.append(accumulatedRewards)
-		states, actions = zip(*trajectory)
-		totalStateBatch += states
+			partialAccumulatedRewards = np.array([accumulatedRewards[t] for t in selectedTimeSteps])
+			totalRewardBatch.append(partialAccumulatedRewards)
+
+		partialTrajectory = [trajectory[t] for t in selectedTimeSteps]
+		states, actions = zip(*partialTrajectory)
 		oneHotActions = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
+		totalStateBatch += states
 		totalActionBatch += oneHotActions
+
 	totalStateBatch = np.array(totalStateBatch)
 	totalActionBatch = np.array(totalActionBatch)
+
 	if withReward:
 		totalRewardBatch = np.concatenate(totalRewardBatch).reshape(-1, 1)
 		dataSet = list(zip(totalStateBatch, totalActionBatch, totalRewardBatch))
 	else:
 		dataSet = list(zip(totalStateBatch, totalActionBatch))
+
 	saveFile = open(path, "wb")
 	pickle.dump(dataSet, saveFile)
+	return dataSet
 
 
 def loadData(path):
@@ -92,12 +108,15 @@ def prepareDataContinuousEnv():
 
 	policy = env.OptimalPolicy(env.actionSpace)
 	trajNum = 2000
+	partialTrajSize = 10
 	path = "./continuous_data_with_reward.pkl"
-	generateData(sampleTraj, accumulateRewards, policy, env.actionSpace, trajNum, path, withReward=True)
+	data = generateData(sampleTraj, accumulateRewards, policy, env.actionSpace, trajNum, path, withReward=True,
+						partialTrajSize=partialTrajSize)
 
-	data = loadData(path)
-	# for d in data: print(d)
 	print("{} data points in {}".format(len(data), path))
+
+	# data = loadData(path)
+	# for d in data: print(d)
 
 	# batch = sampleData(data, 5)
 	# for b in batch: print(b)
