@@ -46,12 +46,15 @@ def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajN
 		trajectory = sampleTrajectory(policy)
 		if withReward:
 			accumulatedRewards = accumulateRewards(trajectory)
-			totalRewardBatch = totalRewardBatch + list(accumulatedRewards)
+			totalRewardBatch.append(accumulatedRewards)
 		states, actions = zip(*trajectory)
-		totalStateBatch = totalStateBatch + list(states)
+		totalStateBatch += states
 		oneHotActions = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
-		totalActionBatch = totalActionBatch + oneHotActions
+		totalActionBatch += oneHotActions
+	totalStateBatch = np.array(totalStateBatch)
+	totalActionBatch = np.array(totalActionBatch)
 	if withReward:
+		totalRewardBatch = np.concatenate(totalRewardBatch).reshape(-1, 1)
 		dataSet = list(zip(totalStateBatch, totalActionBatch, totalRewardBatch))
 	else:
 		dataSet = list(zip(totalStateBatch, totalActionBatch))
@@ -66,18 +69,9 @@ def loadData(path):
 	return dataSet
 
 
-def sampleData(data, batchSize, withReward=True):
-	batch = random.sample(data, batchSize)
-	if withReward:
-		batchInput = [x for x, _, _ in batch]
-		batchOutput1 = [y for _, y, _ in batch]
-		batchOutput2 = [z for _, _, z in batch]
-		reformatedBatch = (batchInput, batchOutput1, batchOutput2)
-	else:
-		batchInput = [x for x, _ in batch]
-		batchOutput = [y for _, y in batch]
-		reformatedBatch = (batchInput, batchOutput)
-	return reformatedBatch
+def sampleData(data, batchSize):
+	batch = [list(varBatch) for varBatch in zip(*random.sample(data, batchSize))]
+	return batch
 
 
 def prepareDataContinuousEnv():
@@ -89,7 +83,7 @@ def prepareDataContinuousEnv():
 	isTerminal = env.IsTerminal(vel+.5)
 	reset = env.Reset(xbound, ybound)
 
-	maxTimeStep = 4
+	maxTimeStep = 10000
 	sampleTraj = SampleTrajectory(maxTimeStep, transitionFunction, isTerminal, reset)
 
 	decay = 0.99
@@ -97,12 +91,16 @@ def prepareDataContinuousEnv():
 	accumulateRewards = AccumulateRewards(decay, rewardFunction)
 
 	policy = env.OptimalPolicy(env.actionSpace)
-	trajNum = 5
+	trajNum = 2000
 	path = "./continuous_data_with_reward.pkl"
 	generateData(sampleTraj, accumulateRewards, policy, env.actionSpace, trajNum, path, withReward=True)
 
 	data = loadData(path)
+	# for d in data: print(d)
 	print("{} data points in {}".format(len(data), path))
+
+	# batch = sampleData(data, 5)
+	# for b in batch: print(b)
 
 
 if __name__ == "__main__":

@@ -2,24 +2,13 @@ import numpy as np
 from AnalyticGeometryFunctions import computeVectorNorm, computeAngleBetweenVectors
 import pygame as pg
 import os
-# init variables
+
+numStateSpace = 4
 actionSpace = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
+numActionSpace = len(actionSpace)
 xBoundary = [0, 180]
 yBoundary = [0, 180]
 vel = 1
-
-class OptimalPolicy:
-	def __init__(self, actionSpace):
-		self.actionSpace = actionSpace
-
-	def __call__(self, state):
-		targetState = state[2:4]
-		agentState = state[0:2]
-		relativeVector = np.array(targetState) - np.array(agentState)
-		angleBetweenVectors = {computeAngleBetweenVectors(relativeVector, action): action for action in
-							   np.array(self.actionSpace)}
-		action = angleBetweenVectors[min(angleBetweenVectors.keys())]
-		return action
 
 
 def checkBound(state, xBoundary, yBoundary):
@@ -100,6 +89,7 @@ class FixedReset():
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
 		return np.concatenate([initialAgentState, targetPosition])
 
+
 class Render():
 	def __init__(self, numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize, saveImage, saveImagePath):
 		self.numAgent = numAgent
@@ -126,3 +116,17 @@ class Render():
 				filenameList = os.listdir(self.saveImagePath)
 				pg.image.save(self.screen, self.saveImagePath+'/'+str(len(filenameList))+'.png')
 			pg.time.wait(1)
+
+
+class OptimalPolicy:
+	def __init__(self, actionSpace):
+		self.actionSpace = actionSpace
+
+	def __call__(self, state):
+		agentState, targetState = getEachState(state)
+		relativeVector = np.array(targetState) - np.array(agentState)
+		angleBetweenVectors = {computeAngleBetweenVectors(relativeVector, action): action for action in
+							   np.array(self.actionSpace)}
+		action = angleBetweenVectors[min(angleBetweenVectors.keys())]
+		return action
+

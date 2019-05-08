@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-
+import data
 
 class GenerateModel:
 	def __init__(self, numStateSpace, numActionSpace, learningRate, regularizationFactor):
@@ -74,15 +74,16 @@ class GenerateModel:
 
 				valuePrediction_ = valueActivation_
 				valueLoss_ = tf.losses.mean_squared_error(valueLabel_, valuePrediction_)
+				tf.add_to_collection("valuePrediction", valuePrediction_)
 				tf.add_to_collection("valueLoss", valueLoss_)
-				valueLossSummary = tf.summary.scalar(valueLoss_)
+				valueLossSummary = tf.summary.scalar("valueLoss", valueLoss_)
 
 			with tf.name_scope("train"):
 				l2RegularizationLoss_ = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.regularizationFactor
 				loss_ = actionLoss_ + valueLoss_ + l2RegularizationLoss_
 				tf.add_to_collection("loss", loss_)
-				regLossSummary = tf.summary.scalar(l2RegularizationLoss_)
-				lossSummary = tf.summary.scalar(loss_)
+				regLossSummary = tf.summary.scalar("l2RegLoss", l2RegularizationLoss_)
+				lossSummary = tf.summary.scalar("loss", loss_)
 
 				optimizer = tf.train.AdamOptimizer(self.learningRate, name='adamOpt_')
 				gradVarPairs_ = optimizer.compute_gradients(loss_)
@@ -131,7 +132,7 @@ class Train:
 		graph = model.graph
 		state_, actionLabel_, valueLabel_ = graph.get_collection_ref("inputs")
 		loss_ = graph.get_collection_ref("loss")[0]
-		accuracy_ = graph.get_collection_ref("accuracy")[0]
+		accuracy_ = graph.get_collection_ref("actionAccuracy")[0]
 		trainOp = graph.get_collection_ref(tf.GraphKeys.TRAIN_OP)[0]
 		fullSummaryOp = graph.get_collection_ref('summaryOps')[0]
 		trainWriter = graph.get_collection_ref('writers')[0]
@@ -144,7 +145,7 @@ class Train:
 		for stepNum in range(self.maxStepNum):
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1 or terminalCond):
 				loss, accuracy, _, fullSummary = model.run([loss_, accuracy_, trainOp, fullSummaryOp],
-                                                           feed_dict={state_: stateBatch,
+                                                        	feed_dict={state_: stateBatch,
                                                                       actionLabel_: actionLabelBatch,
 																	  valueLabel_: valueLabelBatch})
 				trainWriter.add_summary(fullSummary, stepNum)
@@ -156,7 +157,63 @@ class Train:
 														 valueLabel_: valueLabelBatch})
 
 			if stepNum % self.reportInterval == 0:
-				print("#{} loss: {}".format(stepNum, loss))
+				print("#{} loss: {}, acc: {}".format(stepNum, loss, accuracy))
+
+			if terminalCond:
+				break
+
+			lossHistory[stepNum % self.lossHistorySize] = loss
+			terminalCond = bool(np.std(lossHistory) < self.lossChangeThreshold)
+
+		return model
+
+
+class TrainWithMiniBatch:
+	def __init__(self,
+                 maxStepNum, learningRate, batchSize, lossChangeThreshold, lossHistorySize,
+                 reportInterval,
+                 summaryOn=False, testData=None):
+		self.maxStepNum = maxStepNum
+		self.learningRate = learningRate
+		self.batchSize = batchSize
+		self.lossChangeThreshold = lossChangeThreshold
+		self.lossHistorySize = lossHistorySize
+
+		self.reportInterval = reportInterval
+
+		self.summaryOn = summaryOn
+		self.testData = testData
+
+	def __call__(self, model, trainingData):
+		graph = model.graph
+		state_, actionLabel_, valueLabel_ = graph.get_collection_ref("inputs")
+		loss_ = graph.get_collection_ref("loss")[0]
+		accuracy_ = graph.get_collection_ref("actionAccuracy")[0]
+		trainOp = graph.get_collection_ref(tf.GraphKeys.TRAIN_OP)[0]
+		fullSummaryOp = graph.get_collection_ref('summaryOps')[0]
+		trainWriter = graph.get_collection_ref('writers')[0]
+
+		lossHistory = np.ones(self.lossHistorySize)
+		terminalCond = False
+
+		for stepNum in range(self.maxStepNum):
+			stateBatch, actionLabelBatch, valueLabelBatch = data.sample(list(zip(*trainingData)), self.batchSize)
+
+			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1 or terminalCond):
+				loss, accuracy, _, fullSummary = model.run([loss_, accuracy_, trainOp, fullSummaryOp],
+                                                        	feed_dict={state_: stateBatch,
+                                                                      actionLabel_: actionLabelBatch,
+																	  valueLabel_: valueLabelBatch})
+				trainWriter.add_summary(fullSummary, stepNum)
+				evaluate(model, self.testData, summaryOn=True, stepNum=stepNum)
+			else:
+				loss, accuracy, _ = model.run([loss_, accuracy_, trainOp],
+                                              feed_dict={state_: stateBatch,
+														 actionLabel_: actionLabelBatch,
+														 valueLabel_: valueLabelBatch})
+
+			if stepNum % self.reportInterval == 0:
+				print("#{} loss: {}, acc: {}".format(stepNum, loss, accuracy))
 
 			if terminalCond:
 				break
@@ -171,34 +228,47 @@ def evaluate(model, testData, summaryOn=False, stepNum=None):
 	graph = model.graph
 	state_, actionLabel_, valueLabel_ = graph.get_collection_ref("inputs")
 	loss_ = graph.get_collection_ref("loss")[0]
-	accuracy_ = graph.get_collection_ref("accuracy")[0]
+	valueLoss_ = graph.get_collection_ref("valueLoss")[0]
+	accuracy_ = graph.get_collection_ref("actionAccuracy")[0]
 	evalSummaryOp = graph.get_collection_ref('summaryOps')[1]
 	testWriter = graph.get_collection_ref('writers')[1]
 
 	stateBatch, actionLabelBatch, valueLabelBatch = testData
 
 	if summaryOn:
-		loss, accuracy, evalSummary = model.run([loss_, accuracy_, evalSummaryOp],
-                                                feed_dict={state_: stateBatch,
-														   actionLabel_: actionLabelBatch,
-														   valueLabel_: valueLabelBatch})
+		loss, accuracy, valueLoss, evalSummary = model.run([loss_, accuracy_, valueLoss_, evalSummaryOp],
+                                                		   feed_dict={state_: stateBatch,
+														   			  actionLabel_: actionLabelBatch,
+														   			  valueLabel_: valueLabelBatch})
 		testWriter.add_summary(evalSummary, stepNum)
 	else:
-		loss, accuracy = model.run([loss_, accuracy_],
-                                   feed_dict={state_: stateBatch,
-											  actionLabel_: actionLabelBatch,
-											  valueLabel_: valueLabelBatch})
-	return loss, accuracy
+		loss, accuracy, valueLoss = model.run([loss_, accuracy_, valueLoss_],
+                                   			  feed_dict={state_: stateBatch,
+											  			 actionLabel_: actionLabelBatch,
+											  			 valueLabel_: valueLabelBatch})
+	return loss, accuracy, valueLoss
 
 
-def approximatePolicy(stateBatch, policyNet, actionSpace):
+def approximatePolicy(stateBatch, policyValueNet, actionSpace):
 	if np.array(stateBatch).ndim == 1:
 		stateBatch = np.array([stateBatch])
-	graph = policyNet.graph
+	graph = policyValueNet.graph
 	state_ = graph.get_collection_ref("inputs")[0]
 	actionIndices_ = graph.get_collection_ref("actionIndices")[0]
-	actionIndices = policyNet.run(actionIndices_, feed_dict={state_: stateBatch})
+	actionIndices = policyValueNet.run(actionIndices_, feed_dict={state_: stateBatch})
 	actionBatch = [actionSpace[i] for i in actionIndices]
 	if len(actionBatch) == 1:
 		actionBatch = actionBatch[0]
 	return actionBatch
+
+
+def approximateValueFunction(stateBatch, policyValueNet):
+	if np.array(stateBatch).ndim == 1:
+		stateBatch = np.array([stateBatch])
+	graph = policyValueNet.graph
+	state_ = graph.get_collection_ref("inputs")[0]
+	valuePrediction_ = graph.get_collection_ref("valuePrediction")[0]
+	valuePrediction = policyValueNet.run(valuePrediction_, feed_dict={state_: stateBatch})
+	if len(valuePrediction) == 1:
+		valuePrediction = valuePrediction[0][0]
+	return valuePrediction
