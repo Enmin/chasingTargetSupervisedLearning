@@ -2,21 +2,6 @@ import numpy as np
 import pickle
 import random
 import functools as ft
-from AnalyticGeometryFunctions import computeAngleBetweenVectors
-
-
-class OptimalPolicy:
-	def __init__(self, actionSpace):
-		self.actionSpace = actionSpace
-
-	def __call__(self, state):
-		targetState = state[2:4]
-		agentState = state[0:2]
-		relativeVector = np.array(targetState) - np.array(agentState)
-		angleBetweenVectors = {computeAngleBetweenVectors(relativeVector, action): action for action in
-							   np.array(self.actionSpace)}
-		action = angleBetweenVectors[min(angleBetweenVectors.keys())]
-		return action
 
 
 class SampleTrajectory:
@@ -95,32 +80,30 @@ def sampleData(data, batchSize, withReward=True):
 	return reformatedBatch
 
 
-def prepareDataContinuousEnvWithReward():
-	actionSpace = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
-	policy = OptimalPolicy(actionSpace)
-
-	import continuousEnv
+def prepareDataContinuousEnv():
+	import continuousEnv as env
 	xbound = [0, 180]
 	ybound = [0, 180]
 	vel = 1
-	transitionFunction = continuousEnv.TransitionFunction(xbound, ybound, vel)
-	isTerminal = continuousEnv.IsTerminal(vel+.5)
-	reset = continuousEnv.Reset(xbound, ybound)
+	transitionFunction = env.TransitionFunction(xbound, ybound, vel)
+	isTerminal = env.IsTerminal(vel+.5)
+	reset = env.Reset(xbound, ybound)
 
-	maxTimeStep = 180
+	maxTimeStep = 4
 	sampleTraj = SampleTrajectory(maxTimeStep, transitionFunction, isTerminal, reset)
 
 	decay = 0.99
 	rewardFunction = lambda state, action: -1
 	accumulateRewards = AccumulateRewards(decay, rewardFunction)
 
-	trajNum = 160
-	path = "./continuous_reward_data.pkl"
-	generateData(sampleTraj, accumulateRewards, policy, actionSpace, trajNum, path)
+	policy = env.OptimalPolicy(env.actionSpace)
+	trajNum = 5
+	path = "./continuous_data_with_reward.pkl"
+	generateData(sampleTraj, accumulateRewards, policy, env.actionSpace, trajNum, path, withReward=True)
 
 	data = loadData(path)
 	print("{} data points in {}".format(len(data), path))
 
 
 if __name__ == "__main__":
-	prepareDataContinuousEnvWithReward()
+	prepareDataContinuousEnv()
