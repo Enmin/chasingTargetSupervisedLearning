@@ -1,49 +1,47 @@
 import numpy as np
-import tensorflow as tf
 import itertools as it
 import random
 import pickle
-import supervisedLearning as SL
-import neuralNetwork as NN
-import prepareDataContinuousEnv as PD
+import continuousEnv as env
+import policyValueNet as net
+import data
 import visualize as VI
 
 
 if __name__ == "__main__":
 	random.seed(128)
 	np.random.seed(128)
-	tf.set_random_seed(128)
 
-	numStateSpace = 4
-	numActionSpace = 8
-	dataSetPath = 'continuous_data.pkl'
-	dataSet = PD.loadData(dataSetPath)
+	numStateSpace = env.numStateSpace
+	numActionSpace = env.numActionSpace
+	dataSetPath = "19920Steps_2000PartialTrajs_continuousEnv_reward.pkl"
+	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [8000] #list(range(10000, 10000, 1000))
-	trainingDataList = [([state for state, _ in dataSet[:size]], [label for _, label in dataSet[:size]]) for size in trainingDataSizes]
-	trainingData = trainingDataList[0]
+	trainingDataSize = 1000
+	trainingData = [list(varData) for varData in zip(*dataSet[:trainingDataSize])]
 	learningRate = 0.0001
-	regularizationFactor = 1e-4
-	generatePolicyNet = NN.GeneratePolicyNet(numStateSpace, numActionSpace, learningRate, regularizationFactor)
-	policyNetDepth = [2, 3, 4, 5]
-	policyNetWidth = [32, 64, 128, 256]
-	nnList = it.product(policyNetDepth, policyNetWidth)
-	models = {(width, depth): generatePolicyNet(depth, width) for depth, width in nnList}
+	regularizationFactor = 0
+	generatePolicyNet = net.GenerateModel(numStateSpace, numActionSpace, learningRate, regularizationFactor)
+	neuronNums = [96, 192, 384]
+	policyNetDepth = [3, 4, 5]
+	# nnList = [(round(n/d), d) for n, d in it.product(neuronNums, policyNetDepth)]
+	# print(nnList); exit()
+	models = {(n, d): generatePolicyNet([round(n/d)]*d) for n, d in it.product(neuronNums, policyNetDepth)}
 
-	maxStepNum = 50000
+	maxStepNum = 100000
 	reportInterval = 500
 	lossChangeThreshold = 1e-6
 	lossHistorySize = 10
-	train = SL.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
-	                 summaryOn=False, testData=None)
+	train = net.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
+	                  summaryOn=False, testData=None)
 
 	trainedModels = {key: train(model, trainingData) for key, model in models.items()}
 
-	evalTrain = {key: SL.evaluate(model, trainingData) for key, model in trainedModels.items()}
+	evalTrain = {key: net.evaluate(model, trainingData) for key, model in trainedModels.items()}
 
-	evaluateDataPath = 'NeuralNetworkEvaluation.pkl'
+	evaluateDataPath = 'dataForNetStructureComparison.pkl'
 	file = open(evaluateDataPath, "wb")
 	pickle.dump(dataSet, file)
 	file.close()
-	VI.draw(evalTrain, ["neurons per layer", "layer"], ["Loss", "Accuracy"])
+	VI.draw(evalTrain, ["neurons number", "depth"], ["Loss", "Accuracy", "valueLoss"])

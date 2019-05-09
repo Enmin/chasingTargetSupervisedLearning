@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 import random
 import policyValueNet as net
 import data
@@ -10,30 +9,34 @@ import continuousEnv as env
 if __name__ == "__main__":
 	random.seed(128)
 	np.random.seed(128)
-	tf.set_random_seed(128)
 
 	numStateSpace = env.numStateSpace
 	numActionSpace = env.numActionSpace
-	dataSetPath = "199731Steps_2000Trajs_continuousEnv_reward.pkl"
+	# dataSetPath = "199731Steps_2000Trajs_continuousEnv_reward.pkl"
+	dataSetPath = "19920Steps_2000PartialTrajs_continuousEnv_reward.pkl"
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = list(range(6000, 20001, 2000))
+	# trainingDataSizes = list(range(5000, 6001, 1000))
+	trainingDataSizes = [1000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 	testDataSize = 10000
 	testData = data.sampleData(dataSet, testDataSize)
 
 	learningRate = 0.0001
 	regularizationFactor = 0  # 1e-4
-	generatePolicyNet = net.GenerateModel(numStateSpace, numActionSpace, learningRate, regularizationFactor)
-	models = [generatePolicyNet([32]*3) for _ in range(len(trainingDataSizes))]
+	generateModel = net.GenerateModel(numStateSpace, numActionSpace, learningRate, regularizationFactor)
+	models = [generateModel([32]*3) for i in range(len(trainingDataSizes))]
 
-	maxStepNum = 50000
+	# for model in models: print(net.evaluate(model, testData))
+	# exit()
+
+	maxStepNum = 1000000
 	reportInterval = 500
 	lossChangeThreshold = 1e-6
 	lossHistorySize = 10
 	train = net.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
-	                  summaryOn=False, testData=None)
+	                  summaryOn=True, testData=testData)
 
 	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
 
