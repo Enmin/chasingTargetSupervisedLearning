@@ -76,7 +76,7 @@ class GenerateModel:
 				actionAccuracySummary = tf.summary.scalar("actionAccuracy", actionAccuracy_)
 
 				valuePrediction_ = valueActivation_
-				valueLoss_ = tf.losses.mean_squared_error(valueLabel_, valuePrediction_)
+				valueLoss_ = tf.sqrt(tf.losses.mean_squared_error(valueLabel_, valuePrediction_))
 				tf.add_to_collection("valuePrediction", valuePrediction_)
 				tf.add_to_collection("valueLoss", valueLoss_)
 				valueLossSummary = tf.summary.scalar("valueLoss", valueLoss_)
@@ -193,7 +193,7 @@ class GenerateModelSeparateLastLayer:
 				actionAccuracySummary = tf.summary.scalar("actionAccuracy", actionAccuracy_)
 
 				valuePrediction_ = valueActivation_
-				valueLoss_ = tf.losses.mean_squared_error(valueLabel_, valuePrediction_)
+				valueLoss_ = tf.sqrt(tf.losses.mean_squared_error(valueLabel_, valuePrediction_))
 				tf.add_to_collection("valuePrediction", valuePrediction_)
 				tf.add_to_collection("valueLoss", valueLoss_)
 				valueLossSummary = tf.summary.scalar("valueLoss", valueLoss_)
