@@ -3,18 +3,20 @@ import numpy as np
 
 
 class GenerateModel:
-	def __init__(self, numStateSpace, numActionSpace, learningRate, regularizationFactor):
+	def __init__(self, numStateSpace, numActionSpace, learningRate, regularizationFactor, deterministicInit=True):
 		self.numStateSpace = numStateSpace
 		self.numActionSpace = numActionSpace
 		self.learningRate = learningRate
 		self.regularizationFactor = regularizationFactor
+		self.deterministicInit = deterministicInit
 
 	def __call__(self, hiddenWidths, summaryPath="./tbdata"):
-		tf.set_random_seed(128)
-
 		print("Generating Policy Net with hidden layers: {}".format(hiddenWidths))
 		graph = tf.Graph()
 		with graph.as_default():
+			if self.deterministicInit:
+				tf.set_random_seed(128)
+
 			with tf.name_scope("inputs"):
 				state_ = tf.placeholder(tf.float32, [None, self.numStateSpace], name="state_")
 				actionLabel_ = tf.placeholder(tf.int32, [None, self.numActionSpace], name="actionLabel_")
