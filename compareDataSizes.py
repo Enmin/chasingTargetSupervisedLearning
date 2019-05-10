@@ -6,32 +6,32 @@ import visualize as VI
 import continuousEnv as env
 
 
-if __name__ == "__main__":
-	random.seed(128)
-	np.random.seed(128)
+def main(seed=128):
+	random.seed(seed)
+	np.random.seed(seed)
 
-	numStateSpace = env.numStateSpace
-	numActionSpace = env.numActionSpace
-	# dataSetPath = "199731Steps_2000Trajs_continuousEnv_reward.pkl"
-	dataSetPath = "19920Steps_2000PartialTrajs_continuousEnv_reward.pkl"
+	dataSetPath = "19976Steps_4000PartialTrajsHead_continuousEnv_reward.pkl"
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	# trainingDataSizes = list(range(5000, 6001, 1000))
-	trainingDataSizes = [1000]
+	trainingDataSizes = list(range(3000, 12001, 1000))
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
-	testDataSize = 10000
-	testData = data.sampleData(dataSet, testDataSize)
 
-	learningRate = 0.0001
+	testDataSize = 7000
+	testData = [list(varData) for varData in zip(*dataSet[-testDataSize:])]
+
+	numStateSpace = env.numStateSpace
+	numActionSpace = env.numActionSpace
+	learningRate = 1e-4
 	regularizationFactor = 0  # 1e-4
-	generateModel = net.GenerateModel(numStateSpace, numActionSpace, learningRate, regularizationFactor)
-	models = [generateModel([32]*3) for i in range(len(trainingDataSizes))]
+	valueRelativeErrBound = 0.01
+	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound)
+	models = [generateModel([32]*3) for _ in range(len(trainingDataSizes))]
 
 	# for model in models: print(net.evaluate(model, testData))
 	# exit()
 
-	maxStepNum = 1000000
+	maxStepNum = 50000
 	reportInterval = 500
 	lossChangeThreshold = 1e-6
 	lossHistorySize = 10
@@ -40,11 +40,15 @@ if __name__ == "__main__":
 
 	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
 
-	evalTrain = {("Train", size): net.evaluate(model, trainingData) for size, trainingData, model in
+	evalTrain = {("Train", size): list(net.evaluate(model, trainingData).values()) for size, trainingData, model in
 	             zip(trainingDataSizes, trainingDataList, trainedModels)}
-	evalTest = {("Test", size): net.evaluate(model, testData) for size, trainingData, model in
+	evalTest = {("Test", size): list(net.evaluate(model, testData).values()) for size, trainingData, model in
 	            zip(trainingDataSizes, trainingDataList, trainedModels)}
 	evalTrain.update(evalTest)
 
 	print(evalTrain)
-	VI.draw(evalTrain, ["mode", "training_set_size"], ["Loss", "Accuracy", "valueLoss"])
+	VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
+
+
+if __name__ == "__main__":
+	main()
