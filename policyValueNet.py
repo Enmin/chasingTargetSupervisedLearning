@@ -137,11 +137,11 @@ class GenerateModelSeparateLastLayer:
 				state_ = tf.placeholder(tf.float32, [None, self.numStateSpace], name="state_")
 				actionLabel_ = tf.placeholder(tf.int32, [None, self.numActionSpace], name="actionLabel_")
 				valueLabel_ = tf.placeholder(tf.float32, [None, 1], name="valueLabel_")
-				# actionLossCoef_ = tf.constant(50, dtype=tf.float32)
+				actionLossCoef_ = tf.constant(50, dtype=tf.float32)
 				tf.add_to_collection("inputs", state_)
 				tf.add_to_collection("inputs", actionLabel_)
 				tf.add_to_collection("inputs", valueLabel_)
-				# tf.add_to_collection("actionLossCoef", actionLossCoef_)
+				tf.add_to_collection("actionLossCoef", actionLossCoef_)
 
 			with tf.name_scope("hidden"):
 				initWeight = tf.random_uniform_initializer(-0.03, 0.03)
@@ -210,8 +210,7 @@ class GenerateModelSeparateLastLayer:
 
 			with tf.name_scope("train"):
 				l2RegularizationLoss_ = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.regularizationFactor
-				loss_ = 50*actionLoss_ + valueLoss_ + l2RegularizationLoss_
-				# loss_ = actionLossCoef_*actionLoss_ + valueLoss_ + l2RegularizationLoss_
+				loss_ = actionLossCoef_*actionLoss_ + valueLoss_ + l2RegularizationLoss_
 				tf.add_to_collection("loss", loss_)
 				tf.summary.scalar("l2RegLoss", l2RegularizationLoss_)
 				lossSummary = tf.summary.scalar("loss", loss_)
@@ -247,9 +246,9 @@ class GenerateModelSeparateLastLayer:
 
 class Train:
 	def __init__(self,
-                 maxStepNum, learningRate, lossChangeThreshold, lossHistorySize,
-                 reportInterval,
-                 summaryOn=False, testData=None):
+				 maxStepNum, learningRate, lossChangeThreshold, lossHistorySize,
+				 reportInterval,
+				 summaryOn=False, testData=None):
 		self.maxStepNum = maxStepNum
 		self.learningRate = learningRate
 		self.lossChangeThreshold = lossChangeThreshold
@@ -263,7 +262,7 @@ class Train:
 	def __call__(self, model, trainingData):
 		graph = model.graph
 		state_, actionLabel_, valueLabel_ = graph.get_collection_ref("inputs")
-		# actionLossCoef_ = graph.get_collection_ref("actionLossCoef")[0]
+		actionLossCoef_ = graph.get_collection_ref("actionLossCoef")[0]
 		loss_ = graph.get_collection_ref("loss")[0]
 		actionLoss_ = graph.get_collection_ref("actionLoss")[0]
 		valueLoss_ = graph.get_collection_ref("valueLoss")[0]
@@ -278,15 +277,16 @@ class Train:
 		stateBatch, actionLabelBatch, valueLabelBatch = trainingData
 
 		lossHistory = np.ones(self.lossHistorySize)
-		# actionLossCoef = 50
+		actionLossCoef = 50
 
 		for stepNum in range(self.maxStepNum):
-			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch})
-			# evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch, actionLossCoef_: actionLossCoef})
+			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch, actionLossCoef_: actionLossCoef})
 
-			# if stepNum % self.reportInterval == 0:
-			# 	actionLossCoef = max(round(evalDict["valueLoss"] / evalDict["actionLoss"]), 1)
-			# 	print("Coefficient of action loss Updated to {}".format(actionLossCoef))
+			if stepNum % self.reportInterval == 0 and actionLossCoef == 50:
+				# actionLossCoef = evalDict["valueLoss"] / evalDict["actionLoss"]
+				if evalDict["actionAcc"] > .99:
+					actionLossCoef = 0.05/1.27
+					print("Coefficient of action loss Updated to {:.2f}".format(actionLossCoef))
 
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1):
 				trainWriter.add_summary(summary, stepNum)
@@ -304,9 +304,9 @@ class Train:
 
 class TrainWithMiniBatch:
 	def __init__(self,
-                 maxStepNum, learningRate, batchSize, lossChangeThreshold, lossHistorySize,
-                 reportInterval,
-                 summaryOn=False, testData=None):
+				 maxStepNum, learningRate, batchSize, lossChangeThreshold, lossHistorySize,
+				 reportInterval,
+				 summaryOn=False, testData=None):
 		self.maxStepNum = maxStepNum
 		self.learningRate = learningRate
 		self.batchSize = batchSize
