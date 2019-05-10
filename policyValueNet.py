@@ -83,7 +83,7 @@ class GenerateModel:
 
 			with tf.name_scope("train"):
 				l2RegularizationLoss_ = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.regularizationFactor
-				loss_ = actionLoss_ + valueLoss_ + l2RegularizationLoss_
+				loss_ = 50*actionLoss_ + valueLoss_ + l2RegularizationLoss_
 				tf.add_to_collection("loss", loss_)
 				regLossSummary = tf.summary.scalar("l2RegLoss", l2RegularizationLoss_)
 				lossSummary = tf.summary.scalar("loss", loss_)
@@ -200,7 +200,7 @@ class GenerateModelSeparateLastLayer:
 
 			with tf.name_scope("train"):
 				l2RegularizationLoss_ = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.regularizationFactor
-				loss_ = actionLoss_ + valueLoss_ + l2RegularizationLoss_
+				loss_ = 50*actionLoss_ + valueLoss_ + l2RegularizationLoss_
 				tf.add_to_collection("loss", loss_)
 				regLossSummary = tf.summary.scalar("l2RegLoss", l2RegularizationLoss_)
 				lossSummary = tf.summary.scalar("loss", loss_)
@@ -317,7 +317,7 @@ class TrainWithMiniBatch:
 		terminalCond = False
 
 		for stepNum in range(self.maxStepNum):
-			stateBatch, actionLabelBatch, valueLabelBatch = data.sample(list(zip(*trainingData)), self.batchSize)
+			stateBatch, actionLabelBatch, valueLabelBatch = data.sampleData(list(zip(*trainingData)), self.batchSize)
 
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1 or terminalCond):
 				loss, accuracy, _, fullSummary = model.run([loss_, accuracy_, trainOp, fullSummaryOp],

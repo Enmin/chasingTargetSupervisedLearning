@@ -51,7 +51,8 @@ def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajN
 		if (partialTrajSize is None) or (partialTrajSize >= length):
 			selectedTimeSteps = list(range(length))
 		else:
-			selectedTimeSteps = random.sample(list(range(length)), partialTrajSize)
+			# selectedTimeSteps = random.sample(list(range(length)), partialTrajSize)
+			selectedTimeSteps = list(range(partialTrajSize))
 
 		if withReward:
 			accumulatedRewards = accumulateRewards(trajectory)
@@ -108,7 +109,7 @@ def prepareDataContinuousEnv():
 
 	policy = env.OptimalPolicy(env.actionSpace)
 	trajNum = 2000
-	partialTrajSize = 10
+	partialTrajSize = 5
 	path = "./continuous_data_with_reward.pkl"
 	data = generateData(sampleTraj, accumulateRewards, policy, env.actionSpace, trajNum, path, withReward=True,
 						partialTrajSize=partialTrajSize)
