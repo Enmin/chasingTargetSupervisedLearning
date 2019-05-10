@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import pickle
 import policyValueNet as net
 import data
 import visualize as VI
@@ -14,7 +15,7 @@ def main(seed=128):
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = list(range(3000, 12001, 1000))
+	trainingDataSizes = [2000]  # list(range(3000, 9001, 1000))
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
 	testDataSize = 7000
@@ -31,7 +32,7 @@ def main(seed=128):
 	# for model in models: print(net.evaluate(model, testData))
 	# exit()
 
-	maxStepNum = 50000
+	maxStepNum = 100000
 	reportInterval = 500
 	lossChangeThreshold = 1e-6
 	lossHistorySize = 10
@@ -47,8 +48,8 @@ def main(seed=128):
 	evalTrain.update(evalTest)
 
 	print(evalTrain)
-	VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
+	# VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
 
 
 if __name__ == "__main__":
-	main()
+	main(129)
