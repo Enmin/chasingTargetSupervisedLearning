@@ -240,6 +240,9 @@ class GenerateModelSeparateLastLayer:
 			tf.add_to_collection("writers", trainWriter)
 			tf.add_to_collection("writers", testWriter)
 
+			saver = tf.train.Saver()
+			tf.add_to_collection("saver", saver)
+
 			model = tf.Session(graph=graph)
 			model.run(tf.global_variables_initializer())
 
@@ -289,8 +292,8 @@ class Train:
 			if stepNum % self.reportInterval == 0 and actionLossCoef == 50:
 				# actionLossCoef = evalDict["valueLoss"] / evalDict["actionLoss"]
 				if evalDict["actionAcc"] > .99:
-					actionLossCoef = 1*0.01
-					valueLossCoef = 1.27/0.05*0.01
+					actionLossCoef = 1*0.01  # *0.01
+					valueLossCoef = 1.27/0.05*0.01  # *0.01
 					print("Coefficients of losses Updated to {:.2f} {:.2f}".format(actionLossCoef, valueLossCoef))
 
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1):
@@ -301,7 +304,10 @@ class Train:
 				print("#{} {}".format(stepNum, evalDict))
 
 			lossHistory[stepNum % self.lossHistorySize] = evalDict["loss"]
-			if bool(np.std(lossHistory) < self.lossChangeThreshold):
+			lossChange = np.mean(np.abs(lossHistory - np.min(lossHistory)))
+			if lossChange < self.lossChangeThreshold:
+				print("lossHistory:\n{}".format(lossHistory))
+				print("Last loss change: {}".format(lossChange))
 				break
 
 		return model
@@ -375,6 +381,21 @@ def evaluate(model, testData, summaryOn=False, stepNum=None):
 	if summaryOn:
 		testWriter.add_summary(summary, stepNum)
 	return evalDict
+
+
+def saveVariables(model, path):
+	graph = model.graph
+	saver = graph.get_collection_ref("saver")[0]
+	saver.save(model, path)
+	print("Model saved in {}".format(path))
+
+
+def restoreVariables(model, path):
+	graph = model.graph
+	saver = graph.get_collection_ref("saver")[0]
+	saver.restore(model, path)
+	print("Model restored from {}".format(path))
+	return model
 
 
 def approximatePolicy(stateBatch, policyValueNet, actionSpace):
