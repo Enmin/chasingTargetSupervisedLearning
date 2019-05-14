@@ -27,19 +27,32 @@ def getEachState(state):
 
 
 class TransitionFunction():
-	def __init__(self, xBoundary, yBoundary, velocity):
+	def __init__(self, xBoundary, yBoundary, velocity, wolfPolicy):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
 		self.velocity = velocity
+		self.wolfPolicy = wolfPolicy
 
 	def __call__(self, state, action):
-		agentState, targetPosition = getEachState(state)
-		actionMagnitude = computeVectorNorm(np.array(action))
-		modifiedAction = np.array(action) * self.velocity / actionMagnitude
-		newAgentState = np.array(agentState) + modifiedAction
-		if checkBound(newAgentState, self.xBoundary, self.yBoundary):
-			return np.concatenate([newAgentState, targetPosition])
-		return np.concatenate([agentState, targetPosition])
+		oldSheepPos, oldWolfPos = getEachState(state)
+		# wolf
+		wolfAction = self.wolfPolicy(state)
+		wolfActionMagnitude = computeVectorNorm(np.array(wolfAction))
+		modifiedWolfAction = np.array(wolfAction) * self.velocity / wolfActionMagnitude
+		newWolfPos = np.array(oldWolfPos) + modifiedWolfAction
+		# sheep
+		sheepActionMagnitude = computeVectorNorm(np.array(action))
+		modifiedSheepAction = np.array(action) * self.velocity / sheepActionMagnitude
+		newSheepPos = np.array(oldSheepPos) + modifiedSheepAction
+		if checkBound(newSheepPos, self.xBoundary, self.yBoundary):
+			sheepPos = newSheepPos
+		else:
+			sheepPos = oldSheepPos
+		if checkBound(newWolfPos, self.xBoundary, self.yBoundary):
+			wolfPos = newWolfPos
+		else:
+			wolfPos = oldWolfPos
+		return np.concatenate([sheepPos, wolfPos])
 
 
 class IsTerminal():
