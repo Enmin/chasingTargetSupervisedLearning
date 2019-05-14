@@ -156,3 +156,11 @@ class SheepNaiveEscapingPolicy:
 		return action
 
 
+class SheepRandomPolicy:
+	def __init__(self, actionSpace):
+		self.actionSpace = actionSpace
+
+	def __call__(self, state):
+		actionIndex = np.random.randint(len(actionSpace))
+		action = actionSpace[actionIndex]
+		return action
