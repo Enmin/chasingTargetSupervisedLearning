@@ -8,11 +8,12 @@ import pygame as pg
 
 
 class SampleTrajectory:
-	def __init__(self, maxTimeStep, transitionFunction, isTerminal, reset):
+	def __init__(self, maxTimeStep, transitionFunction, isTerminal, reset, render=None):
 		self.maxTimeStep = maxTimeStep
 		self.transitionFunction = transitionFunction
 		self.isTerminal = isTerminal
 		self.reset = reset
+		self.render = render
 
 	def __call__(self, policy):
 		state = self.reset()
@@ -20,6 +21,8 @@ class SampleTrajectory:
 			state = self.reset()
 		trajectory = []
 		for _ in range(self.maxTimeStep):
+			if self.render is not None:
+				self.render(state)
 			action = policy(state)
 			trajectory.append((state, action))
 			newState = self.transitionFunction(state, action)
@@ -30,7 +33,7 @@ class SampleTrajectory:
 
 
 class SampleTrajectoryWithMCTS:
-	def __init__(self, maxTimeStep, isTerminal, reset, render):
+	def __init__(self, maxTimeStep, isTerminal, reset, render=None):
 		self.maxTimeStep = maxTimeStep
 		self.isTerminal = isTerminal
 		self.reset = reset
@@ -46,7 +49,8 @@ class SampleTrajectoryWithMCTS:
 		trajectory = []
 		for _ in range(self.maxTimeStep):
 			state = list(rootNode.id.values())[0]
-			self.render(state)
+			if self.render is not None:
+				self.render(state)
 			if self.isTerminal(state):
 				break
 			nextNode = mcts(rootNode)
@@ -68,12 +72,12 @@ class AccumulateRewards():
 
 
 def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajNumber, path, withReward=True,
-				 partialTrajSize=None):
+				 partialTrajSize=None, reportInterval=100):
 	totalStateBatch = []
 	totalActionBatch = []
 	totalRewardBatch = []
 	for index in range(trajNumber):
-		if index % 100 == 0: print("{} trajectories generated".format(index))
+		if index % reportInterval == 0: print("{} trajectories generated".format(index))
 
 		trajectory = sampleTrajectory(policy)
 		length = len(trajectory)
@@ -155,18 +159,18 @@ def prepareDataContinuousEnv():
 
 def prepareMCTSData():
 	import sheepEscapingEnv as env
-	actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
-	numActionSpace = 8
-	xBoundary = [0, 180]
-	yBoundary = [0, 180]
-	extendedBound = 30
+	actionSpace = env.actionSpace
+	numActionSpace = env.numActionSpace
+	xBoundary = env.xBoundary
+	yBoundary = env.yBoundary
 	vel = 20
-	maxTraj = 10
 	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+
 	# Hyper-parameters
-	numSimulations = 600
-	maxRunningSteps = 70
+	numSimulations = 100  # 600
+	maxRunningSteps = 100
 	rewardFunction = lambda state, action: 1
+
 	# MCTS algorithm
 	# Select child
 	cInit = 1
@@ -175,18 +179,20 @@ def prepareMCTSData():
 	selectChild = SelectChild(calculateScore)
 
 	# render
-	screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
+	extendedBound = 30
+	# screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
 	screenColor = [255, 255, 255]
 	circleColorList = [[50, 255, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50],
-	                   [50, 50, 50], [50, 50, 50], [50, 50, 50]]
+					   [50, 50, 50], [50, 50, 50], [50, 50, 50]]
 	circleSize = 8
 	saveImage = True
 	numOneAgentState = 2
 	positionIndex = [0, 1]
 	numAgent = 2
 	savePath = './sheepDemo'
-	render = env.Render(numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize,
-	                    saveImage, savePath)
+	# render = env.Render(numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize,
+	# 					saveImage, savePath)
+
 	# expand
 	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
 	getActionPrior = GetActionPrior(actionSpace)
@@ -202,8 +208,26 @@ def prepareMCTSData():
 	rollout = RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
 
 	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
-	sampleTraj = SampleTrajectoryWithMCTS(maxRunningSteps, isTerminal, reset, render)
-	sampleTraj(mcts)
+	sampleTraj = SampleTrajectoryWithMCTS(maxRunningSteps, isTerminal, reset, render=None)
+	# sampleTraj(mcts)
+
+	rewardDecay = 0.99
+	accumulateRewards = AccumulateRewards(rewardDecay, rewardFunction)
+	trajNum = 500
+	partialTrajSize = 5
+	path = "./sheepEscapingEnv_data.pkl"
+	reportInterval = 5
+	data = generateData(sampleTraj, accumulateRewards, mcts, actionSpace, trajNum, path, withReward=True, partialTrajSize=partialTrajSize, reportInterval=reportInterval)
+
+	print("{} data points in {}".format(len(data), path))
+
+	# data = loadData(path)
+	# for d in data: print(d)
+	#
+	# batch = sampleData(data, 5)
+	# for b in batch: print(b)
+
+
 if __name__ == "__main__":
 	# prepareDataContinuousEnv()
 	prepareMCTSData()
