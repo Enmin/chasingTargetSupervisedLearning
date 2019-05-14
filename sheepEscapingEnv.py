@@ -12,16 +12,6 @@ yBoundary = [0, 180]
 vel = 1
 
 
-# def checkBound(state, xBoundary, yBoundary):
-# 	xMin, xMax = xBoundary
-# 	yMin, yMax = yBoundary
-# 	xPos, yPos = state
-# 	if xPos >= xMax or xPos <= xMin:
-# 		return False
-# 	elif yPos >= yMax or yPos <= yMin:
-# 		return False
-# 	return True
-
 class CheckBoundaryAndAdjust():
 	def __init__(self, xBoundary, yBoundary):
 		self.xBoundary = xBoundary
@@ -39,8 +29,8 @@ class CheckBoundaryAndAdjust():
 		if position[1] <= self.yMin:
 			position[1] = 2 * self.yMin - position[1]
 
-		toWallDistance = np.concatenate([position[0] - self.xBoundary, position[1] - self.yBoundary, self.xBoundary, self.yBoundary])
-		return position, toWallDistance
+		# toWallDistance = np.concatenate([position[0] - self.xBoundary, position[1] - self.yBoundary, self.xBoundary, self.yBoundary])
+		return position
 
 
 def getEachState(state):
@@ -95,7 +85,7 @@ class Reset():
 		yMin, yMax = self.yBoundary
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		return np.concatenate([initialAgentState, targetPosition])
@@ -113,7 +103,7 @@ class FixedReset():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition and initialDistance >= 20):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
@@ -134,7 +124,7 @@ class ResetForMCTS():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition and initialDistance >= 20):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
