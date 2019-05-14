@@ -145,7 +145,7 @@ class Render():
 		self.circleSize = circleSize
 		self.saveImage = saveImage
 		self.saveImagePath = saveImagePath
-	def __call__(self, state):
+	def __call__(self, state, value=None):
 		for j in range(1):
 			for event in pg.event.get():
 				if event.type == pg.QUIT:
@@ -155,11 +155,16 @@ class Render():
 				oneAgentState = state[self.numOneAgentState * i: self.numOneAgentState * (i + 1)]
 				oneAgentPosition = oneAgentState[min(self.positionIndex): max(self.positionIndex) + 1]
 				pg.draw.circle(self.screen, self.circleColorList[i], [np.int(oneAgentPosition[0]),np.int(oneAgentPosition[1])], self.circleSize)
+			if value is not None:
+				pg.font.init()
+				font = pg.font.Font(pg.font.get_default_font(), self.circleSize)
+				text = font.render(str(value), True, (0, 0, 0))
+				self.screen.blit(text, (state[0], state[1]))
 			pg.display.flip()
 			if self.saveImage==True:
 				filenameList = os.listdir(self.saveImagePath)
 				pg.image.save(self.screen, self.saveImagePath+'/'+str(len(filenameList))+'.png')
-			pg.time.wait(1)
+			pg.time.wait(10)
 
 
 class WolfHeatSeekingPolicy:
