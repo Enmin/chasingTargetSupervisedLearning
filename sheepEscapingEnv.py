@@ -12,15 +12,35 @@ yBoundary = [0, 180]
 vel = 1
 
 
-def checkBound(state, xBoundary, yBoundary):
-	xMin, xMax = xBoundary
-	yMin, yMax = yBoundary
-	xPos, yPos = state
-	if xPos >= xMax or xPos <= xMin:
-		return False
-	elif yPos >= yMax or yPos <= yMin:
-		return False
-	return True
+# def checkBound(state, xBoundary, yBoundary):
+# 	xMin, xMax = xBoundary
+# 	yMin, yMax = yBoundary
+# 	xPos, yPos = state
+# 	if xPos >= xMax or xPos <= xMin:
+# 		return False
+# 	elif yPos >= yMax or yPos <= yMin:
+# 		return False
+# 	return True
+
+class CheckBoundaryAndAdjust():
+	def __init__(self, xBoundary, yBoundary):
+		self.xBoundary = xBoundary
+		self.yBoundary = yBoundary
+		self.xMin, self.xMax = xBoundary
+		self.yMin, self.yMax = yBoundary
+
+	def __call__(self, position):
+		if position[0] >= self.xMax:
+			position[0] = 2 * self.xMax - position[0]
+		if position[0] <= self.xMin:
+			position[0] = 2 * self.xMin - position[0]
+		if position[1] >= self.yMax:
+			position[1] = 2 * self.yMax - position[1]
+		if position[1] <= self.yMin:
+			position[1] = 2 * self.yMin - position[1]
+
+		toWallDistance = np.concatenate([position[0] - self.xBoundary, position[1] - self.yBoundary, self.xBoundary, self.yBoundary])
+		return position, toWallDistance
 
 
 def getEachState(state):
@@ -33,6 +53,7 @@ class TransitionFunction():
 		self.yBoundary = yBoundary
 		self.velocity = velocity
 		self.wolfPolicy = wolfPolicy
+		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
 
 	def __call__(self, state, action):
 		oldSheepPos, oldWolfPos = getEachState(state)
@@ -45,14 +66,8 @@ class TransitionFunction():
 		sheepActionMagnitude = computeVectorNorm(np.array(action))
 		modifiedSheepAction = np.array(action) * self.velocity / sheepActionMagnitude
 		newSheepPos = np.array(oldSheepPos) + modifiedSheepAction
-		if checkBound(newSheepPos, self.xBoundary, self.yBoundary):
-			sheepPos = newSheepPos
-		else:
-			sheepPos = oldSheepPos
-		if checkBound(newWolfPos, self.xBoundary, self.yBoundary):
-			wolfPos = newWolfPos
-		else:
-			wolfPos = oldWolfPos
+		sheepPos = self.checkBound(newSheepPos)
+		wolfPos = self.checkBound(newWolfPos)
 		return np.concatenate([sheepPos, wolfPos])
 
 
@@ -73,13 +88,14 @@ class Reset():
 	def __init__(self, xBoundary, yBoundary):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
+		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
 
 	def __call__(self):
 		xMin, xMax = self.xBoundary
 		yMin, yMax = self.yBoundary
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		while not (checkBound(initialAgentState, self.xBoundary, self.yBoundary) and checkBound(targetPosition, self.xBoundary, self.yBoundary)):
+		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		return np.concatenate([initialAgentState, targetPosition])
@@ -89,6 +105,7 @@ class FixedReset():
 	def __init__(self, xBoundary, yBoundary):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
+		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
 
 	def __call__(self):
 		xMin, xMax = self.xBoundary
@@ -96,7 +113,7 @@ class FixedReset():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not (checkBound(initialAgentState, self.xBoundary, self.yBoundary) and checkBound(targetPosition, self.xBoundary, self.yBoundary) and initialDistance >= 20):
+		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition and initialDistance >= 20):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
@@ -109,6 +126,7 @@ class ResetForMCTS():
 		self.yBoundary = yBoundary
 		self.actionSpace = actionSpace
 		self.numActionSpace = numActionSpace
+		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
 
 	def __call__(self):
 		xMin, xMax = self.xBoundary
@@ -116,7 +134,7 @@ class ResetForMCTS():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not (checkBound(initialAgentState, self.xBoundary, self.yBoundary) and checkBound(targetPosition, self.xBoundary, self.yBoundary) and initialDistance >= 20):
+		while not (self.checkBound(initialAgentState == initialAgentState) and self.checkBound(targetPosition) == targetPosition and initialDistance >= 20):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
