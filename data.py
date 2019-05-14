@@ -2,6 +2,9 @@ import numpy as np
 import pickle
 import random
 import functools as ft
+from anytree import AnyNode as Node
+from mcts import MCTS, CalculateScore, GetActionPrior, selectNextRoot, SelectChild, Expand, RollOut, backup, InitializeChildren
+import pygame as pg
 
 
 class SampleTrajectory:
@@ -23,6 +26,33 @@ class SampleTrajectory:
 			if self.isTerminal(newState):
 				break
 			state = newState
+		return trajectory
+
+
+class SampleTrajectoryWithMCTS:
+	def __init__(self, maxTimeStep, isTerminal, reset, render):
+		self.maxTimeStep = maxTimeStep
+		self.isTerminal = isTerminal
+		self.reset = reset
+		self.render = render
+
+	def __call__(self, mcts):
+		rootNode = self.reset()
+		currState = list(rootNode.id.values())[0]
+		while self.isTerminal(currState):
+			rootNode = self.reset()
+			currState = list(rootNode.id.values())[0]
+
+		trajectory = []
+		for _ in range(self.maxTimeStep):
+			state = list(rootNode.id.values())[0]
+			self.render(state)
+			if self.isTerminal(state):
+				break
+			nextNode = mcts(rootNode)
+			action = list(nextNode.id.keys())[0]
+			trajectory.append((state, action))
+			rootNode = nextNode
 		return trajectory
 
 
@@ -123,5 +153,57 @@ def prepareDataContinuousEnv():
 	# for b in batch: print(b)
 
 
+def prepareMCTSData():
+	import sheepEscapingEnv as env
+	actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
+	numActionSpace = 8
+	xBoundary = [0, 180]
+	yBoundary = [0, 180]
+	extendedBound = 30
+	vel = 20
+	maxTraj = 10
+	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+	# Hyper-parameters
+	numSimulations = 600
+	maxRunningSteps = 70
+	rewardFunction = lambda state, action: 1
+	# MCTS algorithm
+	# Select child
+	cInit = 1
+	cBase = 1
+	calculateScore = CalculateScore(cInit, cBase)
+	selectChild = SelectChild(calculateScore)
+
+	# render
+	screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
+	screenColor = [255, 255, 255]
+	circleColorList = [[50, 255, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50],
+	                   [50, 50, 50], [50, 50, 50], [50, 50, 50]]
+	circleSize = 8
+	saveImage = True
+	numOneAgentState = 2
+	positionIndex = [0, 1]
+	numAgent = 2
+	savePath = './sheepDemo'
+	render = env.Render(numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize,
+	                    saveImage, savePath)
+	# expand
+	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
+	getActionPrior = GetActionPrior(actionSpace)
+	isTerminal = env.IsTerminal(minDistance=vel+0.5)
+	reset = env.ResetForMCTS(xBoundary, yBoundary, actionSpace, numActionSpace)
+	initializeChildren = InitializeChildren(actionSpace, transition, getActionPrior)
+	expand = Expand(transition, isTerminal, initializeChildren)
+	# selectNextRoot = selectNextRoot
+
+	# Rollout
+	rolloutPolicy = lambda state: actionSpace[np.random.choice(range(numActionSpace))]
+	maxRollOutSteps = 10
+	rollout = RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
+
+	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
+	sampleTraj = SampleTrajectoryWithMCTS(maxRunningSteps, isTerminal, reset, render)
+	sampleTraj(mcts)
 if __name__ == "__main__":
-	prepareDataContinuousEnv()
+	# prepareDataContinuousEnv()
+	prepareMCTSData()

@@ -1,6 +1,7 @@
 import numpy as np
 from AnalyticGeometryFunctions import computeVectorNorm, computeAngleBetweenVectors
 import pygame as pg
+from anytree import AnyNode as Node
 import os
 
 numStateSpace = 4
@@ -100,6 +101,29 @@ class FixedReset():
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
 		return np.concatenate([initialAgentState, targetPosition])
+
+
+class ResetForMCTS():
+	def __init__(self, xBoundary, yBoundary, actionSpace, numActionSpace):
+		self.xBoundary = xBoundary
+		self.yBoundary = yBoundary
+		self.actionSpace = actionSpace
+		self.numActionSpace = numActionSpace
+
+	def __call__(self):
+		xMin, xMax = self.xBoundary
+		yMin, yMax = self.yBoundary
+		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+		while not (checkBound(initialAgentState, self.xBoundary, self.yBoundary) and checkBound(targetPosition, self.xBoundary, self.yBoundary) and initialDistance >= 20):
+			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+		initState = np.concatenate([initialAgentState, targetPosition])
+		rootAction = self.actionSpace[np.random.choice(range(self.numActionSpace))]
+		rootNode = Node(id={rootAction: initState}, num_visited=0, sum_value=0, is_expanded=True)
+		return rootNode
 
 
 class Render():
