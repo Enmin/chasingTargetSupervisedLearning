@@ -5,7 +5,7 @@ from anytree import AnyNode as Node
 import os
 
 numStateSpace = 4
-actionSpace = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
+actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
 numActionSpace = len(actionSpace)
 xBoundary = [0, 180]
 yBoundary = [0, 180]
@@ -28,8 +28,6 @@ class CheckBoundaryAndAdjust():
 			position[1] = 2 * self.yMax - position[1]
 		if position[1] <= self.yMin:
 			position[1] = 2 * self.yMin - position[1]
-
-		# toWallDistance = np.concatenate([position[0] - self.xBoundary, position[1] - self.yBoundary, self.xBoundary, self.yBoundary])
 		return position
 
 
@@ -123,11 +121,12 @@ class ResetForMCTS():
 		yMin, yMax = self.yBoundary
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
+		# initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+		# while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+			# initialDistance = computeVectorNorm(targetPosition - initialAgentState)
 		initState = np.concatenate([initialAgentState, targetPosition])
 		rootAction = self.actionSpace[np.random.choice(range(self.numActionSpace))]
 		rootNode = Node(id={rootAction: initState}, num_visited=0, sum_value=0, is_expanded=True)
