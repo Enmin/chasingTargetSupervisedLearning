@@ -3,6 +3,7 @@ from AnalyticGeometryFunctions import computeVectorNorm, computeAngleBetweenVect
 import pygame as pg
 from anytree import AnyNode as Node
 import os
+import data
 
 numStateSpace = 4
 actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
@@ -101,11 +102,31 @@ class FixedReset():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= 30):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
 		return np.concatenate([initialAgentState, targetPosition])
+
+
+class ResetWithinDataSet():
+	def __init__(self, xBoundary, yBoundary, dataSet):
+		self.xBoundary = xBoundary
+		self.yBoundary = yBoundary
+		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+		self.dataSet = dataSet
+
+	def __call__(self):
+		point = data.sampleData(self.dataSet, 1)
+		state, action, value = point
+		sheep, wolf = getEachState(state[0])
+		distance = computeVectorNorm(np.array(sheep) - np.array(wolf))
+		while distance <= 20:
+			point = data.sampleData(self.dataSet, 1)
+			state, action, value = point
+			sheep, wolf = getEachState(state[0])
+			distance = computeVectorNorm(np.array(sheep) - np.array(wolf))
+		return state[0]
 
 
 class ResetForMCTS():
@@ -121,12 +142,12 @@ class ResetForMCTS():
 		yMin, yMax = self.yBoundary
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		# initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		# while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance >= 20):
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
+		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= 30):
+		# while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-			# initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
 		initState = np.concatenate([initialAgentState, targetPosition])
 		rootAction = self.actionSpace[np.random.choice(range(self.numActionSpace))]
 		rootNode = Node(id={rootAction: initState}, num_visited=0, sum_value=0, is_expanded=True)
@@ -163,7 +184,7 @@ class Render():
 			if self.saveImage==True:
 				filenameList = os.listdir(self.saveImagePath)
 				pg.image.save(self.screen, self.saveImagePath+'/'+str(len(filenameList))+'.png')
-			pg.time.wait(10)
+			pg.time.wait(100)
 
 
 class WolfHeatSeekingPolicy:
