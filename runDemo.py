@@ -3,7 +3,7 @@ import random
 import pickle
 import policyValueNet as net
 import data as dt
-import continuousEnv as env
+import sheepEscapingEnv as env
 import pygame as pg
 
 
@@ -11,7 +11,7 @@ def main(seed=128):
 	random.seed(seed)
 	np.random.seed(seed)
 
-	dataSetPath = "19976Steps_4000PartialTrajsHead_continuousEnv_reward.pkl"
+	dataSetPath = "100Traj_closeInit_sheepEscapingEnv_data.pkl"
 	dataSet = dt.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
@@ -27,9 +27,9 @@ def main(seed=128):
 	regularizationFactor = 0  # 1e-4
 	valueRelativeErrBound = 0.01
 	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound)
-	models = [generateModel([32]*3) for _ in range(len(trainingDataSizes))]
+	models = [generateModel([64]*4) for _ in range(len(trainingDataSizes))]
 
-	maxStepNum = 3000
+	maxStepNum = 10000
 	reportInterval = 500
 	lossChangeThreshold = 1e-6
 	lossHistorySize = 10
@@ -39,40 +39,47 @@ def main(seed=128):
 	# trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
 	# net.saveVariables(trainedModels[0], "./savedModels/model")
 
-	trainedModel = net.restoreVariables(models[0], "./savedModels/model.ckpt")
+	trainedModel = net.restoreVariables(models[0],'./savedModels/100Traj_closeInit_model.ckpt')
 	evalTrain = {("Train", size): list(net.evaluate(model, trainingData).values()) for size, trainingData, model in
 	             zip(trainingDataSizes, trainingDataList, [trainedModel])}
 
 	print(evalTrain)
 
 	# demo
-	actionSpace = [[0, 1], [1, 0], [-1, 0], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
+	actionSpace = env.actionSpace
 	xBoundary = [0, 180]
 	yBoundary = [0, 180]
 	extendedBound = 30
 	vel = 1
 	maxTraj = 10
-	transition = env.TransitionFunction(xBoundary, yBoundary, vel)
-	isTerminal = env.IsTerminal(minDistance=vel+0.5)
-	reset = env.Reset(xBoundary, yBoundary)
+	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
+	isTerminal = env.IsTerminal(minDistance=vel+vel/2)
+	reset = env.ResetWithinDataSet(xBoundary, yBoundary, dataSet)
 	sampleTraj = dt.SampleTrajectory(1000, transition, isTerminal, reset)
-	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
+	sheepEscapingPolicy = env.SheepRandomPolicy(actionSpace)
+	policy = lambda state: sheepEscapingPolicy(state)
 	demoEpisode = [zip(*sampleTraj(policy)) for index in range(maxTraj)]
 	demoStates = [states for states, actions in demoEpisode]
-	valueEpisode = [net.approximateValueFunction(states, trainedModel) for states in demoStates]
+	valueEpisode = [np.array(net.approximateValueFunction(states, trainedModel)) for states in demoStates]
 	screen = pg.display.set_mode([xBoundary[1]+extendedBound, yBoundary[1] + extendedBound])
 	screenColor = [255, 255, 255]
 	circleColorList = [[50, 255, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50],
 	                   [50, 50, 50], [50, 50, 50], [50, 50, 50]]
 	circleSize = 8
-	saveImage = True
+	saveImage = False
 	numOneAgentState = 2
 	positionIndex = [0, 1]
 	numAgent = 2
-	savePath = './ValueDemo'
+	savePath = './sheepDemo'
 	render = env.Render(numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize,
 	                    saveImage, savePath)
-	for sublist in range(len(demoStates)):
+
+
+	# states, actions, values = zip(*dt.loadData("100Traj_closeInit_sheepEscapingEnv_data.pkl"))
+	# for sublist in range(len(states)):
+	# 	render(states[sublist], values[sublist])
+	for sublist in range(1, len(demoStates)):
 		for index in range(len(demoStates[sublist])):
 			render(demoStates[sublist][index], valueEpisode[sublist][index])
 
