@@ -11,7 +11,8 @@ def main(seed=128):
 	random.seed(seed)
 	np.random.seed(seed)
 
-	dataSetPath = "100Traj_closeInit_sheepEscapingEnv_data.pkl"
+	# dataSetPath = "sheepEscapingEnv_data_fixed_start.pkl"
+	dataSetPath = "500steps_600simulations_100rolloutSteps_sheepEscapingEnv_data_trivial_reward.pkl"
 	dataSet = dt.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
@@ -37,9 +38,10 @@ def main(seed=128):
 	                  summaryOn=False, testData=testData)
 
 	# trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
-	# net.saveVariables(trainedModels[0], "./savedModels/model")
+	# net.saveVariables(trainedModels[0], "./savedModels/model.ckpt")
+	# exit(0)
 
-	trainedModel = net.restoreVariables(models[0],'./savedModels/100Traj_closeInit_model.ckpt')
+	trainedModel = net.restoreVariables(models[0],'./savedModels/model.ckpt')
 	evalTrain = {("Train", size): list(net.evaluate(model, trainingData).values()) for size, trainingData, model in
 	             zip(trainingDataSizes, trainingDataList, [trainedModel])}
 
@@ -50,15 +52,16 @@ def main(seed=128):
 	xBoundary = [0, 180]
 	yBoundary = [0, 180]
 	extendedBound = 30
-	vel = 1
+	vel = 20
 	maxTraj = 10
 	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
 	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
-	isTerminal = env.IsTerminal(minDistance=vel+vel/2)
+	isTerminal = env.IsTerminal(minDistance=vel+5)
 	reset = env.ResetWithinDataSet(xBoundary, yBoundary, dataSet)
+	# reset = lambda : [70, 70, 110, 110]
 	sampleTraj = dt.SampleTrajectory(1000, transition, isTerminal, reset)
 	sheepEscapingPolicy = env.SheepRandomPolicy(actionSpace)
-	policy = lambda state: sheepEscapingPolicy(state)
+	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
 	demoEpisode = [zip(*sampleTraj(policy)) for index in range(maxTraj)]
 	demoStates = [states for states, actions in demoEpisode]
 	valueEpisode = [np.array(net.approximateValueFunction(states, trainedModel)) for states in demoStates]
