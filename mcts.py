@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import anytree
 from anytree import AnyNode as Node
 from anytree import RenderTree
@@ -91,13 +92,14 @@ def backup(value, node_list):
 
 
 def selectNextRoot(curr_root):
-	children_visit = [child.num_visited for child in curr_root.children]
-	maxIndex = np.argwhere(children_visit == np.max(children_visit)).flatten()
-	selected_child_index = np.random.choice(maxIndex)
-	selected_child = curr_root.children[selected_child_index]
-	next_root_id = selected_child.id
-	next_root = Node(id=next_root_id, num_visited=0, sum_value=0, is_expanded=False)
-	return next_root
+	children_visit_total = math.exp(sum([child.num_visited for child in curr_root.children]))
+	children_visit = {child.id.keys()[0]: math.exp(child.num_visited) / children_visit_total for child in curr_root.children}
+	# maxIndex = np.argwhere(children_visit == np.max(children_visit)).flatten()
+	# selected_child_index = np.random.choice(maxIndex)
+	# selected_child = curr_root.children[selected_child_index]
+	# next_root_id = selected_child.id
+	# next_root = Node(id=next_root_id, num_visited=0, sum_value=0, is_expanded=False)
+	return children_visit
 
 
 class InitializeChildren:
@@ -143,8 +145,8 @@ class MCTS:
 			leaf_node = self.expand(curr_node)
 			value = self.rollout(leaf_node)
 			self.backup(value, node_path)
-		next_root = self.select_next_root(curr_root)
-		return next_root
+		children_visit = self.select_next_root(curr_root)
+		return children_visit
 
 
 def main():
