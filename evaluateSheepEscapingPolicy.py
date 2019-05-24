@@ -8,8 +8,8 @@ class Evaluate:
 		self.sampleTraj = sampleTraj
 		self.numOfEpisodes = numOfEpisodes
 
-	def __call__(self, model):
-		policy = lambda state: net.approximatePolicy(state, model, self.actionSpace)
+	def __call__(self, policy):
+		np.random.seed(128)
 		# sheepNaivePolicy = env.SheepNaiveEscapingPolicy(self.actionSpace)
 		# policy = lambda state: sheepNaivePolicy(state)
 		demoEpisode = [zip(*self.sampleTraj(policy)) for index in range(self.numOfEpisodes)]
@@ -17,4 +17,5 @@ class Evaluate:
 		demoStateLength = [len(traj) for traj in demoStates]
 		averageLength = np.mean(demoStateLength)
 		variance = np.var(demoStateLength)
-		return averageLength, variance
+		print(averageLength, variance)
+		return demoStates
