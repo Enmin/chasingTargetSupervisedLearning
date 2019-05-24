@@ -282,18 +282,22 @@ class Train:
 		stateBatch, actionLabelBatch, valueLabelBatch = trainingData
 
 		lossHistory = np.ones(self.lossHistorySize)
+		actionAccuracyHistory = np.zeros(self.lossHistorySize)
+		valueAccuracyHistory = np.zeros(self.lossHistorySize)
 		actionLossCoef = 50
 		valueLossCoef = 1
+		coefUpdated = False
 
 		for stepNum in range(self.maxStepNum):
 			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch,
 																 actionLossCoef_: actionLossCoef, valueLossCoef_: valueLossCoef})
 
-			if stepNum % self.reportInterval == 0 and actionLossCoef == 50:
+			if stepNum % self.reportInterval == 0 and not coefUpdated:
 				# actionLossCoef = evalDict["valueLoss"] / evalDict["actionLoss"]
-				if evalDict["actionAcc"] > .99:
-					actionLossCoef = 1*0.01  # *0.01
-					valueLossCoef = 1.27/0.05*0.01  # *0.01
+				if evalDict["actionLoss"] < 0.6:
+					actionLossCoef = 5
+					valueLossCoef = 1
+					coefUpdated = True
 					print("Coefficients of losses Updated to {:.2f} {:.2f}".format(actionLossCoef, valueLossCoef))
 
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1):
@@ -305,9 +309,10 @@ class Train:
 
 			lossHistory[stepNum % self.lossHistorySize] = evalDict["loss"]
 			lossChange = np.mean(np.abs(lossHistory - np.min(lossHistory)))
-			if lossChange < self.lossChangeThreshold:
-				print("lossHistory:\n{}".format(lossHistory))
-				print("Last loss change: {}".format(lossChange))
+			actionAccuracyHistory[stepNum % self.lossHistorySize] = evalDict["actionAcc"]
+			valueAccuracyHistory[stepNum % self.lossHistorySize] = evalDict["valueAcc"]
+
+			if lossChange < self.lossChangeThreshold or ((actionAccuracyHistory > 0.995).all() and (valueAccuracyHistory > 0.99).all()):
 				break
 
 		return model
@@ -357,7 +362,7 @@ class TrainWithMiniBatch:
 				print("#{} {}".format(stepNum, evalDict))
 
 			lossHistory[stepNum % self.lossHistorySize] = evalDict["loss"]
-			if bool(np.std(lossHistory) < self.lossChangeThreshold):
+			if np.std(lossHistory) < self.lossChangeThreshold:
 				break
 
 		return model
@@ -412,12 +417,12 @@ def approximatePolicy(stateBatch, policyValueNet, actionSpace):
 
 
 def approximateValueFunction(stateBatch, policyValueNet):
-	if np.array(stateBatch).ndim == 1:
-		stateBatch = np.array([stateBatch])
+	# if np.array(stateBatch).ndim == 1:
+	# 	stateBatch = np.array([stateBatch])
 	graph = policyValueNet.graph
 	state_ = graph.get_collection_ref("inputs")[0]
 	valuePrediction_ = graph.get_collection_ref("valuePrediction")[0]
 	valuePrediction = policyValueNet.run(valuePrediction_, feed_dict={state_: stateBatch})
-	if len(valuePrediction) == 1:
-		valuePrediction = valuePrediction[0][0]
+	# if len(valuePrediction) == 1:
+	# 	valuePrediction = valuePrediction[0][0]
 	return valuePrediction

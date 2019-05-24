@@ -4,37 +4,35 @@ import pickle
 import policyValueNet as net
 import data
 import visualize as VI
-import continuousEnv as env
+import sheepEscapingEnv as env
 
 
-def main(seed=128):
+def main(seed=128, tfseed=128):
 	random.seed(seed)
 	np.random.seed(seed)
 
-	dataSetPath = "19976Steps_4000PartialTrajsHead_continuousEnv_reward.pkl"
+	dataSetPath = "34793steps_500trajs_sheepEscapingEnv_data.pkl"
+	# dataSetPath = "35087steps_500trajs_sheepEscapingEnv_data_actionDist.pkl"
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [2000]  # list(range(3000, 9001, 1000))
+	trainingDataSizes = [5000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
-	testDataSize = 7000
+	testDataSize = 5000
 	testData = [list(varData) for varData in zip(*dataSet[-testDataSize:])]
 
 	numStateSpace = env.numStateSpace
 	numActionSpace = env.numActionSpace
 	learningRate = 1e-4
 	regularizationFactor = 0  # 1e-4
-	valueRelativeErrBound = 0.01
-	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound)
-	models = [generateModel([32]*3) for _ in range(len(trainingDataSizes))]
+	valueRelativeErrBound = 0.05
+	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound, seed=tfseed)
+	models = [generateModel([64, 64, 64, 64]) for _ in range(len(trainingDataSizes))]
 
-	# for model in models: print(net.evaluate(model, testData))
-	# exit()
-
-	maxStepNum = 100000
+	maxStepNum = 50000
 	reportInterval = 500
-	lossChangeThreshold = 1e-6
+	lossChangeThreshold = 1e-8
 	lossHistorySize = 10
 	train = net.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
 	                  summaryOn=True, testData=testData)
@@ -48,8 +46,13 @@ def main(seed=128):
 	evalTrain.update(evalTest)
 
 	print(evalTrain)
+	# saveFile = open("./11000-12000evalResults.pkl", "wb")
+	# pickle.dump(evalTrain, saveFile)
+
 	# VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
+
+	net.saveVariables(trainedModels[0], "./savedModels/model.ckpt")
 
 
 if __name__ == "__main__":
-	main(129)
+	main()

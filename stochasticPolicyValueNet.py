@@ -147,20 +147,21 @@ class Train:
 		stateBatch, actionLabelBatch, valueLabelBatch = trainingData
 
 		lossHistory = np.ones(self.lossHistorySize)
-		actionAccuracyHistory = np.zeros(self.lossHistorySize)
 		valueAccuracyHistory = np.zeros(self.lossHistorySize)
 		actionLossCoef = 30
 		valueLossCoef = 1
+		coefUpdated = False
 
 		for stepNum in range(self.maxStepNum):
 			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch,
 																 actionLossCoef_: actionLossCoef, valueLossCoef_: valueLossCoef})
 
-			if stepNum % self.reportInterval == 0 and actionLossCoef == 30:
+			if stepNum % self.reportInterval == 0 and not coefUpdated:
 				# actionLossCoef = evalDict["valueLoss"] / evalDict["actionLoss"]
-				if evalDict["actionLoss"] < 1.8:
-					actionLossCoef = 1
+				if evalDict["actionLoss"] < 0.6:
+					actionLossCoef = 5
 					valueLossCoef = 1
+					coefUpdated = True
 					print("Coefficients of losses Updated to {:.2f} {:.2f}".format(actionLossCoef, valueLossCoef))
 
 			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1):

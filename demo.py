@@ -1,13 +1,14 @@
 import numpy as np
 import pygame as pg
-import policyValueNet as net
+import stochasticPolicyValueNet as net
+# import policyValueNet as net
 import data
 import sheepEscapingEnv as env
 import sheepEscapingEnvRender as envRender
 import evaluateSheepEscapingPolicy as eval
 
 
-def nnDemo(seed=128):
+def nnDemo(modelPath, seed=128):
 	np.random.seed(seed)
 
 	xBoundary = env.xBoundary
@@ -21,13 +22,13 @@ def nnDemo(seed=128):
 	# reset = env.ResetWithinDataSet(xBoundary, yBoundary, dataSet)
 
 	generateModel = net.GenerateModelSeparateLastLayer(env.numStateSpace, env.numActionSpace, learningRate=0, regularizationFactor=0, valueRelativeErrBound=0.0)
-	model = generateModel([64, 64, 64, 128])
-	modelPath = "./savedModels/model.ckpt"
+	model = generateModel([64, 64, 64, 64])
+	# modelPath = "./savedModels/model.ckpt"
 	trainedModel = net.restoreVariables(model, modelPath)
 	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
 
 	maxTrajLen = 100
-	trajNum = 5
+	trajNum = 1000
 	sampleTraj = data.SampleTrajectory(maxTrajLen, transition, isTerminal, reset)
 	evaluate = eval.Evaluate(sampleTraj, trajNum)
 	evalResults, demoStates = evaluate(policy)
@@ -39,7 +40,7 @@ def nnDemo(seed=128):
 	savePath = None
 	render = envRender.Render(screen, savePath)
 
-	renderOn = True
+	renderOn = False
 	if renderOn:
 		for sublist in range(1, len(demoStates)):
 			for index in range(len(demoStates[sublist])):
@@ -101,5 +102,12 @@ def mctsDemo(seed=128):
 
 
 if __name__ == "__main__":
-	# nnDemo()
-	mctsDemo()
+	import sys
+	if len(sys.argv) != 2:
+		print("Usage: python3 demo.py modelPath/mcts")
+		exit()
+	if sys.argv[1] == "mcts":
+		mctsDemo()
+	else:
+		nnDemo(sys.argv[1])
+
