@@ -4,7 +4,6 @@ import random
 import functools as ft
 from anytree import AnyNode as Node
 from mcts import MCTS, CalculateScore, GetActionPrior, selectNextRoot, SelectChild, Expand, RollOut, backup, InitializeChildren
-import pygame as pg
 
 
 class SampleTrajectory:
@@ -40,11 +39,10 @@ class SampleTrajectoryWithMCTS:
 		self.render = render
 
 	def __call__(self, mcts):
-		rootNode = self.reset()
-		currState = list(rootNode.id.values())[0]
+		currState = self.reset()
 		while self.isTerminal(currState):
-			rootNode = self.reset()
-			currState = list(rootNode.id.values())[0]
+			currState = self.reset()
+		rootNode = Node(id={None: currState}, num_visited=0, sum_value=0, is_expanded=True)
 
 		trajectory = []
 		for _ in range(self.maxTimeStep):
@@ -53,9 +51,14 @@ class SampleTrajectoryWithMCTS:
 				self.render(state)
 			if self.isTerminal(state):
 				break
-			nextNode = mcts(rootNode)
-			action = list(nextNode.id.keys())[0]
-			trajectory.append((state, action))
+			actionDict = mcts(rootNode)
+			actionDistribution = np.array(list(actionDict.values()))
+			maxIndex = np.argmax(actionDistribution).flatten()
+			selected_child_index = np.random.choice(maxIndex)
+			selected_child = rootNode.children[selected_child_index]
+			next_root_id = selected_child.id
+			nextNode = Node(id=next_root_id, num_visited=0, sum_value=0, is_expanded=False)
+			trajectory.append((state, actionDistribution))
 			rootNode = nextNode
 		return trajectory
 
@@ -95,9 +98,9 @@ def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajN
 
 		partialTrajectory = [trajectory[t] for t in selectedTimeSteps]
 		states, actions = zip(*partialTrajectory)
-		oneHotActions = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
+		# oneHotActions = [[1 if (np.array(action) == np.array(actionSpace[index])).all() else 0 for index in range(len(actionSpace))] for action in actions]
 		totalStateBatch += states
-		totalActionBatch += oneHotActions
+		totalActionBatch += actions
 
 	totalStateBatch = np.array(totalStateBatch)
 	totalActionBatch = np.array(totalActionBatch)
@@ -123,6 +126,13 @@ def loadData(path):
 def sampleData(data, batchSize):
 	batch = [list(varBatch) for varBatch in zip(*random.sample(data, batchSize))]
 	return batch
+
+
+def renderDataSet(path, render):
+	dataset = loadData(path)
+	for i in range(len(dataset)):
+		state, action, reward = dataset[i]
+		render(state)
 
 
 def prepareDataContinuousEnv():
@@ -157,77 +167,59 @@ def prepareDataContinuousEnv():
 	# for b in batch: print(b)
 
 
-def prepareMCTSData():
+def prepareSheepEscapingEnvData():
 	import sheepEscapingEnv as env
 	actionSpace = env.actionSpace
 	numActionSpace = env.numActionSpace
 	xBoundary = env.xBoundary
 	yBoundary = env.yBoundary
-	vel = 20
+	vel = env.vel
 	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
+	isTerminal = env.IsTerminal(minDistance=vel + 5)
+	reset = env.Reset(xBoundary, yBoundary)
 
-	# Hyper-parameters
-	numSimulations = 100  # 600
-	maxRunningSteps = 100
 	rewardFunction = lambda state, action: 1
 
-	# MCTS algorithm
-	# Select child
 	cInit = 1
 	cBase = 1
 	calculateScore = CalculateScore(cInit, cBase)
 	selectChild = SelectChild(calculateScore)
 
-	# render
-	extendedBound = 30
-	# screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
-	screenColor = [255, 255, 255]
-	circleColorList = [[50, 255, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50], [50, 50, 50],
-					   [50, 50, 50], [50, 50, 50], [50, 50, 50]]
-	circleSize = 8
-	saveImage = True
-	numOneAgentState = 2
-	positionIndex = [0, 1]
-	numAgent = 2
-	savePath = './sheepDemo'
-	# render = env.Render(numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize,
-	# 					saveImage, savePath)
-
-	# expand
-	transition = env.TransitionFunction(xBoundary, yBoundary, vel, wolfHeatSeekingPolicy)
 	getActionPrior = GetActionPrior(actionSpace)
-	isTerminal = env.IsTerminal(minDistance=vel+0.5)
-	reset = env.ResetForMCTS(xBoundary, yBoundary, actionSpace, numActionSpace)
 	initializeChildren = InitializeChildren(actionSpace, transition, getActionPrior)
 	expand = Expand(transition, isTerminal, initializeChildren)
-	# selectNextRoot = selectNextRoot
 
-	# Rollout
-	rolloutPolicy = lambda state: actionSpace[np.random.choice(range(numActionSpace))]
 	maxRollOutSteps = 10
+	numSimulations = 600
+	maxTrajLen = 100
+	rolloutPolicy = lambda state: actionSpace[np.random.choice(range(numActionSpace))]
 	rollout = RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
-
 	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
-	sampleTraj = SampleTrajectoryWithMCTS(maxRunningSteps, isTerminal, reset, render=None)
-	# sampleTraj(mcts)
+	sampleTraj = SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset)
+
+	# policy = env.SheepNaiveEscapingPolicy(actionSpace)
+	# sampleTraj = SampleTrajectory(maxRunningSteps, transition, isTerminal, reset, render=None)
 
 	rewardDecay = 0.99
 	accumulateRewards = AccumulateRewards(rewardDecay, rewardFunction)
+
 	trajNum = 500
-	partialTrajSize = 5
-	path = "./sheepEscapingEnv_data.pkl"
-	reportInterval = 5
+	partialTrajSize = None
+	path = "./500trajs_sheepEscapingEnv_data_actionDist.pkl"
+	reportInterval = 10
 	data = generateData(sampleTraj, accumulateRewards, mcts, actionSpace, trajNum, path, withReward=True, partialTrajSize=partialTrajSize, reportInterval=reportInterval)
 
 	print("{} data points in {}".format(len(data), path))
 
 	# data = loadData(path)
 	# for d in data: print(d)
-	#
+
 	# batch = sampleData(data, 5)
 	# for b in batch: print(b)
 
 
 if __name__ == "__main__":
 	# prepareDataContinuousEnv()
-	prepareMCTSData()
+	np.random.seed(129)
+	prepareSheepEscapingEnvData()
