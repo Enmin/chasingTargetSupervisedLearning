@@ -1,8 +1,8 @@
 import numpy as np
 from AnalyticGeometryFunctions import computeVectorNorm, computeAngleBetweenVectors
-import pygame as pg
-from anytree import AnyNode as Node
-import os
+# import pygame as pg
+# from anytree import AnyNode as Node
+# import os
 import data
 
 numStateSpace = 4
@@ -10,7 +10,7 @@ actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1,
 numActionSpace = len(actionSpace)
 xBoundary = [0, 180]
 yBoundary = [0, 180]
-vel = 1
+vel = 20
 
 
 class CheckBoundaryAndAdjust():
@@ -49,7 +49,7 @@ class TransitionFunction():
 		# wolf
 		wolfAction = self.wolfPolicy(state)
 		wolfActionMagnitude = computeVectorNorm(np.array(wolfAction))
-		modifiedWolfAction = np.array(wolfAction) * self.velocity / wolfActionMagnitude
+		modifiedWolfAction = np.array(wolfAction) * 0.95*self.velocity / wolfActionMagnitude
 		newWolfPos = np.array(oldWolfPos) + modifiedWolfAction
 		# sheep
 		sheepActionMagnitude = computeVectorNorm(np.array(action))
@@ -73,28 +73,29 @@ class IsTerminal():
 		return False
 
 
+# class Reset():
+# 	def __init__(self, xBoundary, yBoundary):
+# 		self.xBoundary = xBoundary
+# 		self.yBoundary = yBoundary
+# 		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+#
+# 	def __call__(self):
+# 		xMin, xMax = self.xBoundary
+# 		yMin, yMax = self.yBoundary
+# 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
+# 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 		return np.concatenate([initialAgentState, targetPosition])
+
+
 class Reset():
-	def __init__(self, xBoundary, yBoundary):
+	def __init__(self, xBoundary, yBoundary, maxInitDist=np.inf):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
 		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
-
-	def __call__(self):
-		xMin, xMax = self.xBoundary
-		yMin, yMax = self.yBoundary
-		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
-			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		return np.concatenate([initialAgentState, targetPosition])
-
-
-class FixedReset():
-	def __init__(self, xBoundary, yBoundary):
-		self.xBoundary = xBoundary
-		self.yBoundary = yBoundary
-		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+		self.maxInitDist = maxInitDist
 
 	def __call__(self):
 		xMin, xMax = self.xBoundary
@@ -102,7 +103,7 @@ class FixedReset():
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= 30):
+		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= self.maxInitDist):
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
@@ -110,18 +111,19 @@ class FixedReset():
 
 
 class ResetWithinDataSet():
-	def __init__(self, xBoundary, yBoundary, dataSet):
+	def __init__(self, xBoundary, yBoundary, dataSet, minInitDist=-np.inf):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
 		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
 		self.dataSet = dataSet
+		self.minInitDist = minInitDist
 
 	def __call__(self):
 		point = data.sampleData(self.dataSet, 1)
 		state, action, value = point
 		sheep, wolf = getEachState(state[0])
 		distance = computeVectorNorm(np.array(sheep) - np.array(wolf))
-		while distance <= 20:
+		while not (distance >= self.minInitDist):
 			point = data.sampleData(self.dataSet, 1)
 			state, action, value = point
 			sheep, wolf = getEachState(state[0])
@@ -129,62 +131,62 @@ class ResetWithinDataSet():
 		return state[0]
 
 
-class ResetForMCTS():
-	def __init__(self, xBoundary, yBoundary, actionSpace, numActionSpace):
-		self.xBoundary = xBoundary
-		self.yBoundary = yBoundary
-		self.actionSpace = actionSpace
-		self.numActionSpace = numActionSpace
-		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+# class ResetForMCTS():
+# 	def __init__(self, xBoundary, yBoundary, actionSpace, numActionSpace):
+# 		self.xBoundary = xBoundary
+# 		self.yBoundary = yBoundary
+# 		self.actionSpace = actionSpace
+# 		self.numActionSpace = numActionSpace
+# 		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+#
+# 	def __call__(self):
+# 		xMin, xMax = self.xBoundary
+# 		yMin, yMax = self.yBoundary
+# 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+# 		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= 50):
+# 		# while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
+# 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
+# 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
+# 		initState = np.concatenate([initialAgentState, targetPosition])
+# 		rootAction = self.actionSpace[np.random.choice(range(self.numActionSpace))]
+# 		rootNode = Node(id={rootAction: initState}, num_visited=0, sum_value=0, is_expanded=True)
+# 		return rootNode
 
-	def __call__(self):
-		xMin, xMax = self.xBoundary
-		yMin, yMax = self.yBoundary
-		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-		initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all() and initialDistance <= 30):
-		# while not ((self.checkBound(initialAgentState) == initialAgentState).all() and (self.checkBound(targetPosition) == targetPosition).all()):
-			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
-			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		initState = np.concatenate([initialAgentState, targetPosition])
-		rootAction = self.actionSpace[np.random.choice(range(self.numActionSpace))]
-		rootNode = Node(id={rootAction: initState}, num_visited=0, sum_value=0, is_expanded=True)
-		return rootNode
 
-
-class Render():
-	def __init__(self, numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize, saveImage, saveImagePath):
-		self.numAgent = numAgent
-		self.numOneAgentState = numOneAgentState
-		self.positionIndex = positionIndex
-		self.screen = screen
-		self.screenColor = screenColor
-		self.circleColorList = circleColorList
-		self.circleSize = circleSize
-		self.saveImage = saveImage
-		self.saveImagePath = saveImagePath
-	def __call__(self, state, value=None):
-		for j in range(1):
-			for event in pg.event.get():
-				if event.type == pg.QUIT:
-					pg.quit()
-			self.screen.fill(self.screenColor)
-			for i in range(self.numAgent):
-				oneAgentState = state[self.numOneAgentState * i: self.numOneAgentState * (i + 1)]
-				oneAgentPosition = oneAgentState[min(self.positionIndex): max(self.positionIndex) + 1]
-				pg.draw.circle(self.screen, self.circleColorList[i], [np.int(oneAgentPosition[0]),np.int(oneAgentPosition[1])], self.circleSize)
-			if value is not None:
-				pg.font.init()
-				font = pg.font.Font(pg.font.get_default_font(), self.circleSize)
-				text = font.render(str(value), True, (0, 0, 0))
-				self.screen.blit(text, (state[0], state[1]))
-			pg.display.flip()
-			if self.saveImage==True:
-				filenameList = os.listdir(self.saveImagePath)
-				pg.image.save(self.screen, self.saveImagePath+'/'+str(len(filenameList))+'.png')
-			pg.time.wait(100)
+# class Render():
+# 	def __init__(self, numAgent, numOneAgentState, positionIndex, screen, screenColor, circleColorList, circleSize, saveImage, saveImagePath):
+# 		self.numAgent = numAgent
+# 		self.numOneAgentState = numOneAgentState
+# 		self.positionIndex = positionIndex
+# 		self.screen = screen
+# 		self.screenColor = screenColor
+# 		self.circleColorList = circleColorList
+# 		self.circleSize = circleSize
+# 		self.saveImage = saveImage
+# 		self.saveImagePath = saveImagePath
+# 	def __call__(self, state, value=None):
+# 		for j in range(1):
+# 			for event in pg.event.get():
+# 				if event.type == pg.QUIT:
+# 					pg.quit()
+# 			self.screen.fill(self.screenColor)
+# 			for i in range(self.numAgent):
+# 				oneAgentState = state[self.numOneAgentState * i: self.numOneAgentState * (i + 1)]
+# 				oneAgentPosition = oneAgentState[min(self.positionIndex): max(self.positionIndex) + 1]
+# 				pg.draw.circle(self.screen, self.circleColorList[i], [np.int(oneAgentPosition[0]),np.int(oneAgentPosition[1])], self.circleSize)
+# 			if value is not None:
+# 				pg.font.init()
+# 				font = pg.font.Font(pg.font.get_default_font(), self.circleSize)
+# 				text = font.render(str(value), True, (0, 0, 0))
+# 				self.screen.blit(text, (state[0], state[1]))
+# 			pg.display.flip()
+# 			if self.saveImage==True:
+# 				filenameList = os.listdir(self.saveImagePath)
+# 				pg.image.save(self.screen, self.saveImagePath+'/'+str(len(filenameList))+'.png')
+# 			pg.time.wait(500)
 
 
 class WolfHeatSeekingPolicy:
