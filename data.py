@@ -53,7 +53,7 @@ class SampleTrajectoryWithMCTS:
 				break
 			actionDict = mcts(rootNode)
 			actionDistribution = np.array(list(actionDict.values()))
-			maxIndex = np.argmax(actionDistribution).flatten()
+			maxIndex = np.argwhere(actionDistribution == np.max(actionDistribution)).flatten()
 			selected_child_index = np.random.choice(maxIndex)
 			selected_child = rootNode.children[selected_child_index]
 			next_root_id = selected_child.id
