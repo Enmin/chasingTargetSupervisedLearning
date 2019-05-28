@@ -15,7 +15,7 @@ def main(seed=128, tfseed=128):
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [5000, 15000]  # [5000, 15000, 30000, 45000, 60000]
+	trainingDataSizes = [45000]  # [5000, 15000, 30000, 45000, 60000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
 	testDataSize = 12640
@@ -31,13 +31,13 @@ def main(seed=128, tfseed=128):
 
 	# net.restoreVariables(models[0], "./savedModels/64*4_70000steps_minibatch_contState_actionDist")
 
-	maxStepNum = 200000
+	maxStepNum = 100000
 	batchSize = 4096
 	reportInterval = 1000
 	lossChangeThreshold = 1e-8
 	lossHistorySize = 10
 	train = net.Train(maxStepNum, batchSize, lossChangeThreshold, lossHistorySize, reportInterval,
-	                  summaryOn=True, testData=testData)
+	                  summaryOn=False, testData=None)
 
 	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
 
