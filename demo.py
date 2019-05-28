@@ -1,14 +1,14 @@
 import numpy as np
 import pygame as pg
-import stochasticPolicyValueNet as net
-# import policyValueNet as net
+# import stochasticPolicyValueNet as net
+import policyValueNet as net
 import data
 import sheepEscapingEnv as env
 import sheepEscapingEnvRender as envRender
 import evaluateSheepEscapingPolicy as eval
 
 
-def nnDemo(modelPath, seed=128):
+def nnDemo(modelPath, trajNum, renderOn, savePath=None, seed=128):
 	np.random.seed(seed)
 
 	xBoundary = env.xBoundary
@@ -19,37 +19,32 @@ def nnDemo(modelPath, seed=128):
 	transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
 	isTerminal = env.IsTerminal(minDistance=env.vel+5)
 	reset = env.Reset(xBoundary, yBoundary)
-	# reset = env.ResetWithinDataSet(xBoundary, yBoundary, dataSet)
 
 	generateModel = net.GenerateModelSeparateLastLayer(env.numStateSpace, env.numActionSpace, learningRate=0, regularizationFactor=0, valueRelativeErrBound=0.0)
 	model = generateModel([64, 64, 64, 64])
-	# modelPath = "./savedModels/model.ckpt"
 	trainedModel = net.restoreVariables(model, modelPath)
 	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
 
 	maxTrajLen = 100
-	trajNum = 1000
 	sampleTraj = data.SampleTrajectory(maxTrajLen, transition, isTerminal, reset)
 	evaluate = eval.Evaluate(sampleTraj, trajNum)
 	evalResults, demoStates = evaluate(policy)
 
 	# valueEpisode = [np.array(net.approximateValueFunction(states, trainedModel)) for states in demoStates]
 
-	extendedBound = 0
-	screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
-	savePath = None
-	render = envRender.Render(screen, savePath)
-
-	renderOn = False
 	if renderOn:
-		for sublist in range(1, len(demoStates)):
+		extendedBound = 0
+		screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
+		render = envRender.Render(screen, savePath)
+		for sublist in range(len(demoStates)):
 			for index in range(len(demoStates[sublist])):
 				render(demoStates[sublist][index])
 
 	print(evalResults)
+	return evalResults
 
 
-def mctsDemo(seed=128):
+def mctsDemo(trajNum, renderOn, savePath=None, seed=128):
 	np.random.seed(seed)
 
 	xBoundary = env.xBoundary
@@ -60,7 +55,7 @@ def mctsDemo(seed=128):
 	transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
 	isTerminal = env.IsTerminal(minDistance=env.vel+5)
 	reset = env.Reset(xBoundary, yBoundary)
-	# reset = env.ResetWithinDataSet(xBoundary, yBoundary, dataSet)
+	# reset = lambda: [0, 0, 40, 100]
 
 	rewardFunction = lambda state, action: 1
 
@@ -81,33 +76,32 @@ def mctsDemo(seed=128):
 	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
 
 	maxTrajLen = 100
-	trajNum = 1
 	sampleTraj = data.SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset, render=None)
 	evaluate = eval.Evaluate(sampleTraj, trajNum)
 
 	evalResults, demoStates = evaluate(mcts)
 
-	extendedBound = 0
-	screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
-	savePath = None
-	render = envRender.Render(screen, savePath)
-
-	renderOn = True
 	if renderOn:
+		extendedBound = 0
+		screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
+		render = envRender.Render(screen, savePath)
 		for sublist in range(len(demoStates)):
 			for index in range(len(demoStates[sublist])):
 				render(demoStates[sublist][index])
 
 	print(evalResults)
+	return evalResults
 
 
 if __name__ == "__main__":
 	import sys
 	if len(sys.argv) != 2:
-		print("Usage: python3 demo.py modelPath/mcts")
+		print("Usage: python3 demo.py modelPath|mcts")
 		exit()
+	trajNum = 2
+	renderOn = True
 	if sys.argv[1] == "mcts":
-		mctsDemo()
+		mctsDemo(trajNum, renderOn)
 	else:
-		nnDemo(sys.argv[1])
+		nnDemo(sys.argv[1], trajNum, renderOn)
 

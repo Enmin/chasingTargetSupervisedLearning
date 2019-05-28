@@ -221,5 +221,4 @@ def prepareSheepEscapingEnvData():
 
 if __name__ == "__main__":
 	# prepareDataContinuousEnv()
-	np.random.seed(129)
 	prepareSheepEscapingEnvData()

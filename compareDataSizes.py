@@ -9,13 +9,13 @@ import visualize as VI
 
 def main(seed=128, tfseed=128):
 	random.seed(seed)
-	np.random.seed(seed)
+	np.random.seed(4027)
 
 	dataSetPath = "72640steps_1000trajs_sheepEscapingEnv_data_actionDist.pkl"
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [45000]  # [5000, 15000, 30000, 45000, 60000]
+	trainingDataSizes = [60000]  # [5000, 15000, 30000, 45000, 60000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
 	testDataSize = 12640
@@ -29,9 +29,9 @@ def main(seed=128, tfseed=128):
 	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound, seed=tfseed)
 	models = [generateModel([64, 64, 64, 64]) for _ in range(len(trainingDataSizes))]
 
-	# net.restoreVariables(models[0], "./savedModels/64*4_70000steps_minibatch_contState_actionDist")
+	net.restoreVariables(models[0], "savedModels/60000data_64x4_minibatch_100kIter_contState_actionDist")
 
-	maxStepNum = 100000
+	maxStepNum = 50000
 	batchSize = 4096
 	reportInterval = 1000
 	lossChangeThreshold = 1e-8
@@ -48,13 +48,14 @@ def main(seed=128, tfseed=128):
 	evalTrain.update(evalTest)
 
 	print(evalTrain)
-	saveFile = open("diffDataSizesModels/{}evalResults.pkl".format(trainingDataSizes), "wb")
-	pickle.dump(evalTrain, saveFile)
+	# saveFile = open("diffDataSizesModels/{}evalResults.pkl".format(trainingDataSizes), "wb")
+	# pickle.dump(evalTrain, saveFile)
 
 	# VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
 
-	for size, model in zip(trainingDataSizes, trainedModels):
-		net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
+	# for size, model in zip(trainingDataSizes, trainedModels):
+	# 	net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
+	net.saveVariables(trainedModels[0], "savedModels/60000data_64x4_minibatch_150kIter_contState_actionDist")
 
 
 if __name__ == "__main__":
