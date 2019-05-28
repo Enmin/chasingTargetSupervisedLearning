@@ -3,38 +3,40 @@ import random
 import pickle
 import policyValueNet as net
 import data
-import visualize as VI
 import sheepEscapingEnv as env
+import visualize as VI
 
 
 def main(seed=128, tfseed=128):
 	random.seed(seed)
 	np.random.seed(seed)
 
-	dataSetPath = "34793steps_500trajs_sheepEscapingEnv_data.pkl"
-	# dataSetPath = "35087steps_500trajs_sheepEscapingEnv_data_actionDist.pkl"
+	dataSetPath = "72640steps_1000trajs_sheepEscapingEnv_data_actionDist.pkl"
 	dataSet = data.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [5000]
+	trainingDataSizes = [5000, 15000]  # [5000, 15000, 30000, 45000, 60000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
-	testDataSize = 5000
+	testDataSize = 12640
 	testData = [list(varData) for varData in zip(*dataSet[-testDataSize:])]
 
 	numStateSpace = env.numStateSpace
 	numActionSpace = env.numActionSpace
 	learningRate = 1e-4
-	regularizationFactor = 0  # 1e-4
-	valueRelativeErrBound = 0.05
+	regularizationFactor = 0
+	valueRelativeErrBound = 0.1
 	generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound, seed=tfseed)
 	models = [generateModel([64, 64, 64, 64]) for _ in range(len(trainingDataSizes))]
 
-	maxStepNum = 50000
-	reportInterval = 500
+	# net.restoreVariables(models[0], "./savedModels/64*4_70000steps_minibatch_contState_actionDist")
+
+	maxStepNum = 200000
+	batchSize = 4096
+	reportInterval = 1000
 	lossChangeThreshold = 1e-8
 	lossHistorySize = 10
-	train = net.Train(maxStepNum, learningRate, lossChangeThreshold, lossHistorySize, reportInterval,
+	train = net.Train(maxStepNum, batchSize, lossChangeThreshold, lossHistorySize, reportInterval,
 	                  summaryOn=True, testData=testData)
 
 	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
@@ -46,12 +48,13 @@ def main(seed=128, tfseed=128):
 	evalTrain.update(evalTest)
 
 	print(evalTrain)
-	# saveFile = open("./11000-12000evalResults.pkl", "wb")
-	# pickle.dump(evalTrain, saveFile)
+	saveFile = open("diffDataSizesModels/{}evalResults.pkl".format(trainingDataSizes), "wb")
+	pickle.dump(evalTrain, saveFile)
 
 	# VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
 
-	net.saveVariables(trainedModels[0], "./savedModels/model.ckpt")
+	for size, model in zip(trainingDataSizes, trainedModels):
+		net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
 
 
 if __name__ == "__main__":
