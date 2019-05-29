@@ -8,6 +8,7 @@ positionIndex = [0, 1]
 screenColor = [255, 255, 255]
 circleColorList = [[50, 255, 50], [50, 50, 50]]
 circleSize = 8
+titleSize = 10
 
 
 class Render:
@@ -16,7 +17,8 @@ class Render:
 		self.imagePath = imagePath
 		self.delay = delay
 
-	def __call__(self, state, value=None):
+	def __call__(self, state, value=None, round=None):
+		width, height = pg.display.get_surface().get_size()
 		for j in range(1):
 			for event in pg.event.get():
 				if event.type == pg.QUIT:
@@ -30,7 +32,11 @@ class Render:
 				pg.font.init()
 				font = pg.font.Font(pg.font.get_default_font(), circleSize)
 				text = font.render(str(value), True, (0, 0, 0))
-				self.screen.blit(text, (state[0], state[1]))
+				self.screen.blit(text, (state[0]-circleSize/2, state[1]-circleSize/2))
+			if round is not None:
+				font = pg.font.Font(pg.font.get_default_font(), titleSize)
+				text = font.render("round {}".format(round), True, (0, 0, 0))
+				self.screen.blit(text, (width/2, height))
 			pg.display.flip()
 			if self.imagePath is not None:
 				filenameList = os.listdir(self.imagePath)
