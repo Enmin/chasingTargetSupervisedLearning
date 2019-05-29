@@ -74,13 +74,17 @@ class IsTerminal():
 
 
 class Reset():
-	def __init__(self, xBoundary, yBoundary, maxInitDist=np.inf):
+	def __init__(self, xBoundary, yBoundary, initialSeed=None, maxInitDist=np.inf):
 		self.xBoundary = xBoundary
 		self.yBoundary = yBoundary
 		self.checkBound = CheckBoundaryAndAdjust(xBoundary, yBoundary)
+		self.seed = initialSeed
 		self.maxInitDist = maxInitDist
 
 	def __call__(self):
+		if self.seed is not None:
+			np.random.seed(self.seed)
+			self.seed = self.seed + 1
 		xMin, xMax = self.xBoundary
 		yMin, yMax = self.yBoundary
 		initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
@@ -90,8 +94,6 @@ class Reset():
 			initialAgentState = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			targetPosition = np.array([np.random.uniform(xMin, xMax), np.random.uniform(yMin, yMax)])
 			initialDistance = computeVectorNorm(targetPosition - initialAgentState)
-		print(initialAgentState)
-		print(targetPosition)
 		return np.concatenate([initialAgentState, targetPosition])
 
 
