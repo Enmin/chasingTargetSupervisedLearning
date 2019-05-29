@@ -2,7 +2,7 @@ import numpy as np
 import random
 import pickle
 import policyValueNet as net
-import data
+import dataTools
 import sheepEscapingEnv as env
 import visualize as VI
 
@@ -12,7 +12,7 @@ def main(seed=128, tfseed=128):
 	np.random.seed(4027)
 
 	dataSetPath = "72640steps_1000trajs_sheepEscapingEnv_data_actionDist.pkl"
-	dataSet = data.loadData(dataSetPath)
+	dataSet = dataTools.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
 	trainingDataSizes = [60000]  # [5000, 15000, 30000, 45000, 60000]
@@ -31,7 +31,7 @@ def main(seed=128, tfseed=128):
 
 	net.restoreVariables(models[0], "savedModels/60000data_64x4_minibatch_100kIter_contState_actionDist")
 
-	maxStepNum = 50000
+	maxStepNum = 100000
 	batchSize = 4096
 	reportInterval = 1000
 	lossChangeThreshold = 1e-8
@@ -55,8 +55,8 @@ def main(seed=128, tfseed=128):
 
 	# for size, model in zip(trainingDataSizes, trainedModels):
 	# 	net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
-	net.saveVariables(trainedModels[0], "savedModels/60000data_64x4_minibatch_150kIter_contState_actionDist")
+	net.saveVariables(trainedModels[0], "savedModels/iter_60000data_64x4_minibatch_200kIter_contState_actionDist")
 
 
 if __name__ == "__main__":
-	main()
+	main(20)

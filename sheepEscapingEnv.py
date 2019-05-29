@@ -3,7 +3,7 @@ from AnalyticGeometryFunctions import computeVectorNorm, computeAngleBetweenVect
 # import pygame as pg
 # from anytree import AnyNode as Node
 # import os
-import data
+import dataTools
 
 numStateSpace = 4
 actionSpace = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
@@ -106,12 +106,12 @@ class ResetWithinDataSet():
 		self.minInitDist = minInitDist
 
 	def __call__(self):
-		point = data.sampleData(self.dataSet, 1)
+		point = dataTools.sampleData(self.dataSet, 1)
 		state, action, value = point
 		sheep, wolf = getEachState(state[0])
 		distance = computeVectorNorm(np.array(sheep) - np.array(wolf))
 		while not (distance >= self.minInitDist):
-			point = data.sampleData(self.dataSet, 1)
+			point = dataTools.sampleData(self.dataSet, 1)
 			state, action, value = point
 			sheep, wolf = getEachState(state[0])
 			distance = computeVectorNorm(np.array(sheep) - np.array(wolf))

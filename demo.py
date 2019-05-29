@@ -2,7 +2,7 @@ import numpy as np
 import pygame as pg
 # import stochasticPolicyValueNet as net
 import policyValueNet as net
-import data
+import dataTools
 import sheepEscapingEnv as env
 import sheepEscapingEnvRender as envRender
 import evaluateSheepEscapingPolicy as eval
@@ -40,7 +40,7 @@ def nnDemo(modelPath, trajNum, renderOn, savePath=None, seed=128):
 	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
 
 	maxTrajLen = 100
-	sampleTraj = data.SampleTrajectory(maxTrajLen, transition, isTerminal, reset)
+	sampleTraj = dataTools.SampleTrajectory(maxTrajLen, transition, isTerminal, reset)
 	evaluate = eval.Evaluate(sampleTraj, trajNum)
 	evalResults, demoStates = evaluate(policy)
 
@@ -90,7 +90,7 @@ def mctsDemo(trajNum, renderOn, savePath=None, seed=128):
 	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
 
 	maxTrajLen = 100
-	sampleTraj = data.SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset, render=None)
+	sampleTraj = dataTools.SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset, render=None)
 	evaluate = eval.Evaluate(sampleTraj, trajNum)
 	evalResults, demoStates = evaluate(mcts)
 

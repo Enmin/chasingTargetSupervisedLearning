@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import data
+import dataTools
 
 
 class GenerateModel:
@@ -292,7 +292,7 @@ class Train:
 			if self.batchSize is None:
 				stateBatch, actionLabelBatch, valueLabelBatch = trainingData
 			else:
-				stateBatch, actionLabelBatch, valueLabelBatch = data.sampleData(trainingDataList, self.batchSize)
+				stateBatch, actionLabelBatch, valueLabelBatch = dataTools.sampleData(trainingDataList, self.batchSize)
 			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch,
 																 actionLossCoef_: actionLossCoef, valueLossCoef_: valueLossCoef})
 

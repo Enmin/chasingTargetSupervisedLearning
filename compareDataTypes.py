@@ -2,7 +2,7 @@ import numpy as np
 import random
 import pickle
 import policyValueNet as net
-import data
+import dataTools
 import visualize as VI
 import sheepEscapingEnv as env
 
@@ -15,10 +15,10 @@ def main(seed=128, tfseed=128):
 	actionLabel_path = "35087steps_500trajs_sheepEscapingEnv_data_actionLabel.pkl"
 	discState_path = "35087steps_500trajs_sheepEscapingEnv_data_discState_actionDist.pkl"
 	nearWallInit_path = "10222steps_500trajs_sheepEscapingEnv_actionDist_initNearWall.pkl"
-	controlSet = data.loadData(control_path)
-	actionLabelSet = data.loadData(actionLabel_path)
-	discStateSet = data.loadData(discState_path)
-	nearWallInitSet = data.loadData(nearWallInit_path)
+	controlSet = dataTools.loadData(control_path)
+	actionLabelSet = dataTools.loadData(actionLabel_path)
+	discStateSet = dataTools.loadData(discState_path)
+	nearWallInitSet = dataTools.loadData(nearWallInit_path)
 	nearWallBiasedSet = controlSet[:20000] + nearWallInitSet[:10000]
 
 	trainingDataTypes = {"control": controlSet, "actionLabel": actionLabelSet, "discState": discStateSet, "nearWallBiased": nearWallBiasedSet}
