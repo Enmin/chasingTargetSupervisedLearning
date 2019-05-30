@@ -17,3 +17,8 @@ def computeAngleBetweenVectors(vector1, vector2):
 
 def computeVectorNorm(vector):
     return np.power(np.power(vector, 2).sum(axis = 0), 0.5)
+
+def getSymmetricVector(symmetricAxis, originalVector):
+    orthogonalVector = symmetricAxis.dot(originalVector) * symmetricAxis / np.power(computeVectorNorm(symmetricAxis),2) - originalVector
+    symmetricVector = originalVector + 2*orthogonalVector
+    return symmetricVector
