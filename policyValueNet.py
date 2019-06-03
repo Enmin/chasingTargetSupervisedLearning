@@ -138,19 +138,12 @@ class GenerateModelSeparateLastLayer:
 
 
 class Train:
-	def __init__(self,
-				 maxStepNum, batchSize, lossChangeThreshold, lossHistorySize,
-				 reportInterval,
-				 summaryOn=False, testData=None):
+	def __init__(self, maxStepNum, batchSize, terimnalController, CoefficientController, trainReporter):
 		self.maxStepNum = maxStepNum
 		self.batchSize = batchSize
-		self.lossChangeThreshold = lossChangeThreshold
-		self.lossHistorySize = lossHistorySize
-
-		self.reportInterval = reportInterval
-
-		self.summaryOn = summaryOn
-		self.testData = testData
+		self.reporter = trainReporter
+		self.terminalController = terimnalController
+		self.CoefficientController = CoefficientController
 
 	def __call__(self, model, trainingData):
 		graph = model.graph
@@ -167,13 +160,7 @@ class Train:
 		fetches = [{"loss": loss_, "actionLoss": actionLoss_, "actionAcc": actionAccuracy_, "valueLoss": valueLoss_, "valueAcc": valueAccuracy_},
 				   trainOp, fullSummaryOp]
 
-		lossHistory = np.ones(self.lossHistorySize)
-		actionAccuracyHistory = np.zeros(self.lossHistorySize)
-		valueAccuracyHistory = np.zeros(self.lossHistorySize)
-		actionLossCoef = 50
-		valueLossCoef = 1
-		coefUpdated = False
-
+		evalDict = None
 		trainingDataList = list(zip(*trainingData))
 
 		for stepNum in range(self.maxStepNum):
@@ -181,30 +168,13 @@ class Train:
 				stateBatch, actionLabelBatch, valueLabelBatch = trainingData
 			else:
 				stateBatch, actionLabelBatch, valueLabelBatch = dataTools.sampleData(trainingDataList, self.batchSize)
+			actionLossCoef, valueLossCoef = self.CoefficientController(evalDict)
 			evalDict, _, summary = model.run(fetches, feed_dict={state_: stateBatch, actionLabel_: actionLabelBatch, valueLabel_: valueLabelBatch,
 																 actionLossCoef_: actionLossCoef, valueLossCoef_: valueLossCoef})
 
-			if stepNum % self.reportInterval == 0 and not coefUpdated:
-				# actionLossCoef = evalDict["valueLoss"] / evalDict["actionLoss"]
-				if evalDict["actionLoss"] < 0:
-					actionLossCoef = 5
-					valueLossCoef = 1
-					coefUpdated = True
-					print("Coefficients of losses Updated to {:.2f} {:.2f}".format(actionLossCoef, valueLossCoef))
+			self.reporter(evalDict, stepNum, trainWriter, summary)
 
-			if self.summaryOn and (stepNum % self.reportInterval == 0 or stepNum == self.maxStepNum-1):
-				trainWriter.add_summary(summary, stepNum)
-				evaluate(model, self.testData, summaryOn=True, stepNum=stepNum)
-
-			if stepNum % self.reportInterval == 0:
-				print("#{} {}".format(stepNum, evalDict))
-
-			lossHistory[stepNum % self.lossHistorySize] = evalDict["loss"]
-			lossChange = np.mean(np.abs(lossHistory - np.min(lossHistory)))
-			actionAccuracyHistory[stepNum % self.lossHistorySize] = evalDict["actionAcc"]
-			valueAccuracyHistory[stepNum % self.lossHistorySize] = evalDict["valueAcc"]
-
-			if lossChange < self.lossChangeThreshold or ((actionAccuracyHistory > 0.995).all() and (valueAccuracyHistory > 0.99).all()):
+			if self.terminalController(evalDict, stepNum):
 				break
 
 		return model

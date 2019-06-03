@@ -5,6 +5,7 @@ import policyValueNet as net
 import dataTools
 import sheepEscapingEnv as env
 import visualize as VI
+import trainTools
 
 
 def main(seed=128, tfseed=128):
@@ -15,7 +16,7 @@ def main(seed=128, tfseed=128):
 	dataSet = dataTools.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [60000]  # [5000, 15000, 30000, 45000, 60000]
+	trainingDataSizes = [1000]  # [5000, 15000, 30000, 45000, 60000]
 	trainingDataList = [[list(varData) for varData in zip(*dataSet[:size])] for size in trainingDataSizes]
 
 	testDataSize = 12640
@@ -32,12 +33,16 @@ def main(seed=128, tfseed=128):
 	net.restoreVariables(models[0], "savedModels/60000data_64x4_minibatch_100kIter_contState_actionDist")
 
 	maxStepNum = 100000
-	batchSize = 4096
+	batchSize = None
 	reportInterval = 1000
 	lossChangeThreshold = 1e-8
 	lossHistorySize = 10
-	train = net.Train(maxStepNum, batchSize, lossChangeThreshold, lossHistorySize, reportInterval,
-	                  summaryOn=False, testData=None)
+	initActionCoefficient = 50
+	initValueCoefficient = 1
+	trainTerminalController = trainTools.TrainTerminalController(lossHistorySize, lossChangeThreshold)
+	coefficientController = trainTools.coefficientCotroller(initActionCoefficient, initValueCoefficient)
+	trainReporter = trainTools.TrainReporter(maxStepNum, reportInterval)
+	train = net.Train(maxStepNum, batchSize, trainTerminalController, coefficientController, trainReporter)
 
 	trainedModels = [train(model, data) for model, data in zip(models, trainingDataList)]
 
@@ -55,7 +60,7 @@ def main(seed=128, tfseed=128):
 
 	# for size, model in zip(trainingDataSizes, trainedModels):
 	# 	net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
-	net.saveVariables(trainedModels[0], "savedModels/iter_60000data_64x4_minibatch_200kIter_contState_actionDist")
+	# net.saveVariables(trainedModels[0], "savedModels/iter_60000data_64x4_minibatch_200kIter_contState_actionDist")
 
 
 if __name__ == "__main__":
