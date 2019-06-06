@@ -39,7 +39,7 @@ class SelectChild:
 		return selected_child
 
 
-class GetActionPrior:
+class UniformActionPrior:
 	def __init__(self, action_space):
 		self.action_space = action_space
 
@@ -91,15 +91,27 @@ def backup(value, node_list):
 		node.num_visited += 1
 
 
-def selectNextRoot(curr_root):
-	sumOfExpVisit = sum([math.exp(child.num_visited) for child in curr_root.children])
-	actionDict = {list(child.id.keys())[0]: math.exp(child.num_visited) / sumOfExpVisit for child in curr_root.children}
-	# maxIndex = np.argwhere(children_visit == np.max(children_visit)).flatten()
-	# selected_child_index = np.random.choice(maxIndex)
-	# selected_child = curr_root.children[selected_child_index]
-	# next_root_id = selected_child.id
-	# next_root = Node(id=next_root_id, num_visited=0, sum_value=0, is_expanded=False)
-	return actionDict
+def getPlainActionDist(root):
+	visits = np.array([child.num_visited for child in root.children])
+	actionProbs = visits / np.sum(visits)
+	actionDist = {list(child.id.keys())[0]: prob for child, prob in zip(root.children, actionProbs)}
+	return actionDist
+
+
+def getSoftmaxActionDist(root):
+	visits = np.array([child.num_visited for child in root.children])
+	expVisits = np.exp(visits)
+	actionProbs = expVisits / np.sum(expVisits)
+	actionDist = {list(child.id.keys())[0]: prob for child, prob in zip(root.children, actionProbs)}
+	return actionDist
+
+
+def getGreedyAction(root):
+	visits = np.array([child.num_visited for child in root.children])
+	maxIndices = np.argwhere(visits == np.max(visits)).flatten()
+	selectedIndex = np.random.choice(maxIndices)
+	action = list(root.children[selectedIndex].id.keys())[0]
+	return action
 
 
 class InitializeChildren:
@@ -120,19 +132,20 @@ class InitializeChildren:
 		return node
 
 
-class MCTS:
-	def __init__(self, num_simulation, selectChild, expand, rollout, backup, select_next_root):
+class MCTSPolicy:
+	def __init__(self, num_simulation, selectChild, expand, nodeValue, backup, getActionOrActionDist):
 		self.num_simulation = num_simulation
 		self.select_child = selectChild
 		self.expand = expand
-		self.rollout = rollout
+		self.nodeValue = nodeValue
 		self.backup = backup
-		self.select_next_root = select_next_root
+		self.getActionOrActionDist = getActionOrActionDist
 
-	def __call__(self, curr_root):
-		curr_root = self.expand(curr_root)
+	def __call__(self, state):
+		root = Node(id={None: state}, num_visited=0, sum_value=0, is_expanded=False)
+		root = self.expand(root)
 		for explore_step in range(self.num_simulation):
-			curr_node = curr_root
+			curr_node = root
 			node_path = [curr_node]
 
 			while curr_node.is_expanded:
@@ -143,10 +156,10 @@ class MCTS:
 				curr_node = next_node
 
 			leaf_node = self.expand(curr_node)
-			value = self.rollout(leaf_node)
+			value = self.nodeValue(leaf_node)
 			self.backup(value, node_path)
-		actionDistribution = self.select_next_root(curr_root)
-		return actionDistribution
+		mctsOutput = self.getActionOrActionDist(root)
+		return mctsOutput
 
 
 def main():

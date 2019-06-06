@@ -1,5 +1,6 @@
 import numpy as np
 import pygame as pg
+import mcts
 # import stochasticPolicyValueNet as net
 import policyValueNet as net
 import dataTools
@@ -24,101 +25,86 @@ def makeVideo(videoName, path):
 		print("Demo generate Failed, needs to be done manually")
 
 
-def nnDemo(modelPath, trajNum, renderOn, savePath=None, seed=128):
-	xBoundary = env.xBoundary
-	yBoundary = env.yBoundary
-	actionSpace = env.actionSpace
+class SheepEscapingDemo:
+	def __init__(self, trajNum, maxTrajLen, renderOn, savePath=None, saveVideo=False, seed=128):
+		self.trajNum = trajNum
+		self.maxTrajLen = maxTrajLen
+		self.renderOn = renderOn
+		self.savePath = savePath
+		self.saveVideo = saveVideo
+		self.seed = seed
 
-	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
-	transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
-	isTerminal = env.IsTerminal(minDistance=env.vel+5)
-	reset = env.Reset(xBoundary, yBoundary, initialSeed=seed)
+	def __call__(self, policy, useActionDist):
+		xBoundary = env.xBoundary
+		yBoundary = env.yBoundary
+		actionSpace = env.actionSpace
 
-	generateModel = net.GenerateModelSeparateLastLayer(env.numStateSpace, env.numActionSpace, learningRate=0, regularizationFactor=0, valueRelativeErrBound=0.0)
-	model = generateModel([64, 64, 64, 64])
-	trainedModel = net.restoreVariables(model, modelPath)
-	policy = lambda state: net.approximatePolicy(state, trainedModel, actionSpace)
+		wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+		transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
+		isTerminal = env.IsTerminal(minDistance=env.vel + 5)
+		reset = env.Reset(xBoundary, yBoundary, initialSeed=self.seed)
 
-	maxTrajLen = 100
-	sampleTraj = dataTools.SampleTrajectory(maxTrajLen, transition, isTerminal, reset)
-	evaluate = eval.Evaluate(sampleTraj, trajNum)
-	evalResults, demoStates = evaluate(policy)
+		sampleTraj = dataTools.SampleTrajectory(self.maxTrajLen, transition, isTerminal, reset, useActionDist)
+		evaluate = eval.Evaluate(sampleTraj, trajNum)
+		evalResults, demoStates = evaluate(policy)
+		print(evalResults)
 
-	valueEpisode = [np.array(net.approximateValueFunction(states, trainedModel)) for states in demoStates]
+		if renderOn:
+			extendedBound = 10
+			screen = pg.display.set_mode([xBoundary[1], yBoundary[1] + extendedBound])
+			render = envRender.Render(screen, self.savePath, 1)
+			for trajIndex in range(len(demoStates)):
+				for stepIndex in range(len(demoStates[trajIndex])):
+					render(demoStates[trajIndex][stepIndex], trajIndex)
+			if self.saveVideo:
+				videoName = "mean_{}_{}_trajectories_nn_demo.mp4".format(evalResults['mean'], trajNum)
+				makeVideo(videoName, self.savePath)
 
-	if renderOn:
-		extendedBound = 10
-		screen = pg.display.set_mode([xBoundary[1], yBoundary[1] + extendedBound])
-		render = envRender.Render(screen, savePath, 1)
-		for sublist in range(len(demoStates)):
-			for index in range(len(demoStates[sublist])):
-				render(demoStates[sublist][index], int(round(valueEpisode[sublist][index][0])), sublist)
-
-	print(evalResults)
-	videoName = "mean_{}_{}_trajectories_nn_demo.mp4".format(evalResults['mean'], trajNum)
-	makeVideo(videoName, savePath)
-	return evalResults
-
-
-def mctsDemo(trajNum, renderOn, savePath=None, seed=128):
-	xBoundary = env.xBoundary
-	yBoundary = env.yBoundary
-	actionSpace = env.actionSpace
-
-	wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
-	transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
-	isTerminal = env.IsTerminal(minDistance=env.vel+5)
-	reset = env.Reset(xBoundary, yBoundary, initialSeed=seed)
-	# reset = lambda: [0, 0, 40, 100]
-
-	rewardFunction = lambda state, action: 1
-
-	from mcts import MCTS, CalculateScore, GetActionPrior, selectNextRoot, SelectChild, Expand, RollOut, backup, InitializeChildren
-	cInit = 1
-	cBase = 1
-	calculateScore = CalculateScore(cInit, cBase)
-	selectChild = SelectChild(calculateScore)
-
-	getActionPrior = GetActionPrior(actionSpace)
-	initializeChildren = InitializeChildren(actionSpace, transition, getActionPrior)
-	expand = Expand(transition, isTerminal, initializeChildren)
-
-	maxRollOutSteps = 10
-	numSimulations = 600
-	rolloutPolicy = lambda state: actionSpace[np.random.choice(range(env.numActionSpace))]
-	rollout = RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
-	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
-
-	maxTrajLen = 100
-	sampleTraj = dataTools.SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset, render=None)
-	evaluate = eval.Evaluate(sampleTraj, trajNum)
-	evalResults, demoStates = evaluate(mcts)
-
-	if renderOn:
-		extendedBound = 0
-		screen = pg.display.set_mode([xBoundary[1] + extendedBound, yBoundary[1] + extendedBound])
-		render = envRender.Render(screen, savePath, 1)
-		for sublist in range(len(demoStates)):
-			for index in range(len(demoStates[sublist])):
-				render(demoStates[sublist][index], )
-
-	print(evalResults)
-	videoName = "mean_{}_{}_trajectories_mcts_demo.mp4".format(evalResults['mean'], trajNum)
-	makeVideo(videoName, savePath)
-	return evalResults
+		return evalResults
 
 
 if __name__ == "__main__":
-	import sys
-	if len(sys.argv) != 2:
-		print("Usage: python3 demo.py modelPath|mcts")
-		exit()
-	trajNum = 2
+	trajNum = 1
+	maxTrajLen = 100
 	renderOn = True
-	if sys.argv[1] == "mcts":
-		mctsDemo(trajNum, renderOn)
-	else:
-		nnDemo(sys.argv[1], trajNum, renderOn)
-	# mctsDemo(20, renderOn=False, savePath='./sheepDemo')
-	# nnDemo(modelPath="savedModels/100k_iter_60000data_64x4_minibatch_150kIter_contState_actionDist", trajNum=20, renderOn=False, savePath='./sheepDemo')
+	demo = SheepEscapingDemo(trajNum, maxTrajLen, renderOn)
 
+	nnDemo = False
+	if nnDemo:
+		modelPath = "savedModels/60000data_64x4_minibatch_100kIter_contState_actionDist"
+		modelStructure = [64]*4
+		generateModel = net.GenerateModelSeparateLastLayer(env.numStateSpace, env.numActionSpace, learningRate=0, regularizationFactor=0, valueRelativeErrBound=0.0)
+		model = generateModel(modelStructure)
+		trainedModel = net.restoreVariables(model, modelPath)
+		policy = lambda state: net.approximatePolicy(state, trainedModel, env.actionSpace)
+		useActionDist = False
+	else:
+		xBoundary = env.xBoundary
+		yBoundary = env.yBoundary
+		actionSpace = env.actionSpace
+
+		wolfHeatSeekingPolicy = env.WolfHeatSeekingPolicy(actionSpace)
+		transition = env.TransitionFunction(xBoundary, yBoundary, env.vel, wolfHeatSeekingPolicy)
+		isTerminal = env.IsTerminal(minDistance=env.vel + 5)
+
+		rewardFunction = lambda state, action: 1
+
+		cInit = 1
+		cBase = 1
+		calculateScore = mcts.CalculateScore(cInit, cBase)
+		selectChild = mcts.SelectChild(calculateScore)
+
+		getActionPrior = mcts.UniformActionPrior(actionSpace)
+		initializeChildren = mcts.InitializeChildren(actionSpace, transition, getActionPrior)
+		expand = mcts.Expand(transition, isTerminal, initializeChildren)
+
+		maxRollOutSteps = 5
+		rolloutPolicy = lambda state: actionSpace[np.random.choice(range(env.numActionSpace))]
+		nodeValue = mcts.RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
+
+		numSimulations = 100
+		useActionDist = True
+		getPolicyOutput = mcts.getSoftmaxActionDist
+		policy = mcts.MCTSPolicy(numSimulations, selectChild, expand, nodeValue, mcts.backup, getPolicyOutput)
+
+	demo(policy, useActionDist)

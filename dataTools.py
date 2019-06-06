@@ -2,16 +2,25 @@ import numpy as np
 import pickle
 import random
 import functools as ft
-from anytree import AnyNode as Node
-from mcts import MCTS, CalculateScore, GetActionPrior, selectNextRoot, SelectChild, Expand, RollOut, backup, InitializeChildren
+from mcts import MCTSPolicy, CalculateScore, UniformActionPrior, getSoftmaxActionDist, SelectChild, Expand, RollOut, backup, InitializeChildren
+
+
+def greedyActionFromDist(actionDist):
+	actions = list(actionDist.keys())
+	probs = list(actionDist.values())
+	maxIndices = np.argwhere(probs == np.max(probs)).flatten()
+	selectedIndex = np.random.choice(maxIndices)
+	selectedAction = actions[selectedIndex]
+	return selectedAction
 
 
 class SampleTrajectory:
-	def __init__(self, maxTimeStep, transitionFunction, isTerminal, reset, render=None):
+	def __init__(self, maxTimeStep, transition, isTerminal, reset, useActionDist=False, render=None):
 		self.maxTimeStep = maxTimeStep
-		self.transitionFunction = transitionFunction
+		self.transition = transition
 		self.isTerminal = isTerminal
 		self.reset = reset
+		self.useActionDist = useActionDist
 		self.render = render
 
 	def __call__(self, policy):
@@ -22,44 +31,17 @@ class SampleTrajectory:
 		for _ in range(self.maxTimeStep):
 			if self.render is not None:
 				self.render(state)
-			action = policy(state)
-			trajectory.append((state, action))
-			newState = self.transitionFunction(state, action)
+			if self.useActionDist:
+				actionDist = policy(state)
+				action = greedyActionFromDist(actionDist)
+				trajectory.append((state, actionDist))
+			else:
+				action = policy(state)
+				trajectory.append((state, action))
+			newState = self.transition(state, action)
 			if self.isTerminal(newState):
 				break
 			state = newState
-		return trajectory
-
-
-class SampleTrajectoryWithMCTS:
-	def __init__(self, maxTimeStep, isTerminal, reset, render=None):
-		self.maxTimeStep = maxTimeStep
-		self.isTerminal = isTerminal
-		self.reset = reset
-		self.render = render
-
-	def __call__(self, mcts):
-		currState = self.reset()
-		while self.isTerminal(currState):
-			currState = self.reset()
-		rootNode = Node(id={None: currState}, num_visited=0, sum_value=0, is_expanded=True)
-
-		trajectory = []
-		for _ in range(self.maxTimeStep):
-			state = list(rootNode.id.values())[0]
-			if self.render is not None:
-				self.render(state)
-			if self.isTerminal(state):
-				break
-			actionDict = mcts(rootNode)
-			actionDistribution = np.array(list(actionDict.values()))
-			maxIndex = np.argwhere(actionDistribution == np.max(actionDistribution)).flatten()
-			selected_child_index = np.random.choice(maxIndex)
-			selected_child = rootNode.children[selected_child_index]
-			next_root_id = selected_child.id
-			nextNode = Node(id=next_root_id, num_visited=0, sum_value=0, is_expanded=False)
-			trajectory.append((state, actionDistribution))
-			rootNode = nextNode
 		return trajectory
 
 
@@ -67,6 +49,7 @@ class AccumulateRewards():
 	def __init__(self, decay, rewardFunction):
 		self.decay = decay
 		self.rewardFunction = rewardFunction
+
 	def __call__(self, trajectory):
 		rewards = [self.rewardFunction(state, action) for state, action in trajectory]
 		accumulateReward = lambda accumulatedReward, reward: self.decay * accumulatedReward + reward
@@ -186,7 +169,7 @@ def prepareSheepEscapingEnvData():
 	calculateScore = CalculateScore(cInit, cBase)
 	selectChild = SelectChild(calculateScore)
 
-	getActionPrior = GetActionPrior(actionSpace)
+	getActionPrior = UniformActionPrior(actionSpace)
 	initializeChildren = InitializeChildren(actionSpace, transition, getActionPrior)
 	expand = Expand(transition, isTerminal, initializeChildren)
 
@@ -195,7 +178,7 @@ def prepareSheepEscapingEnvData():
 	maxTrajLen = 100
 	rolloutPolicy = lambda state: actionSpace[np.random.choice(range(numActionSpace))]
 	rollout = RollOut(rolloutPolicy, maxRollOutSteps, transition, rewardFunction, isTerminal)
-	mcts = MCTS(numSimulations, selectChild, expand, rollout, backup, selectNextRoot)
+	mcts = MCTSPolicy(numSimulations, selectChild, expand, rollout, backup, getSoftmaxActionDist)
 	sampleTraj = SampleTrajectoryWithMCTS(maxTrajLen, isTerminal, reset)
 
 	# policy = env.SheepNaiveEscapingPolicy(actionSpace)
