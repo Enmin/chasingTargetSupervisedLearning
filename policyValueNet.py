@@ -93,7 +93,7 @@ class GenerateModelSeparateLastLayer:
 				valueLossSummary = tf.summary.scalar("valueLoss", valueLoss_)
 
 				relativeErrorBound_ = tf.constant(self.valueRelativeErrBound)
-				relativeValueError_ = tf.cast((tf.abs((valuePrediction_ - valueLabel_) / valueLabel_)), tf.float64)
+				relativeValueError_ = tf.cast((tf.abs((valuePrediction_ - valueLabel_) / valueLabel_)), tf.float32)
 				valueAccuracy_ = tf.reduce_mean(tf.cast(tf.less(relativeValueError_, relativeErrorBound_), tf.float64))
 				tf.add_to_collection("valueAccuracy", valueAccuracy_)
 				valueAccuracySummary = tf.summary.scalar("valueAccuracy", valueAccuracy_)
