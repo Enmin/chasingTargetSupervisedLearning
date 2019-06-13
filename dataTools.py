@@ -99,6 +99,33 @@ def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajN
 	return dataSet
 
 
+def generateSymmetricData(originalDataSet):
+	from AnalyticGeometryFunctions import getSymmetricVector
+	from sheepEscapingEnv import actionSpace, xBoundary
+	bias = xBoundary[1]
+	symmetries = [np.array([1,1]), np.array([0,1]), np.array([1,0]), np.array([-1,1])]
+	newDataSet = []
+	for data in originalDataSet:
+		turningPoint = None
+		state, actionDistribution, value = data
+		for symmetry in symmetries:
+			newState = np.concatenate([getSymmetricVector(symmetry, np.array(state[0:2])), getSymmetricVector(symmetry, np.array(state[2:4]))])
+			newActionDistributionDict = {tuple(np.round(getSymmetricVector(symmetry, np.array(actionSpace[index])))): actionDistribution[index] for index in range(len(actionDistribution))}
+			newActionDistribution = [newActionDistributionDict[action] for action in actionSpace]
+			if np.all(symmetry == np.array([1, 1])):
+				turningPoint = np.array([newState, newActionDistribution, value])
+			newDataSet.append(np.array([newState, newActionDistribution, value]))
+		if turningPoint is None:
+			continue
+		state, actionDistribution, value = turningPoint
+		for symmetry in symmetries:
+			newState = np.concatenate([getSymmetricVector(symmetry, np.array(state[0:2])), getSymmetricVector(symmetry, np.array(state[2:4]))])
+			newActionDistributionDict = {tuple(np.round(getSymmetricVector(symmetry, np.array(actionSpace[index])))): actionDistribution[index] for index in range(len(actionDistribution))}
+			newActionDistribution = [newActionDistributionDict[action] for action in actionSpace]
+			newDataSet.append(np.array([newState, newActionDistribution, value]))
+	return newDataSet
+
+
 def loadData(path):
 	pklFile = open(path, "rb")
 	dataSet = pickle.load(pklFile)

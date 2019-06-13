@@ -90,15 +90,6 @@ def main(seed=128, tfseed=128):
 	applyFunctoin = ApplyFunction()
 	resultDF = toSplitFrame.groupby(levelNames).apply(applyFunctoin, dataSet, None, tfseed)
 	print(resultDF)
-	exit()
-	# saveFile = open("diffDataSizesModels/{}evalResults.pkl".format(trainingDataSizes), "wb")
-	# pickle.dump(evalTrain, saveFile)
-
-	# VI.draw(evalTrain, ["mode", "training_set_size"], ["actionLoss", "actionAcc", "valueLoss", "valueAcc"])
-
-	# for size, model in zip(trainingDataSizes, trainedModels):
-	# 	net.saveVariables(model, "diffDataSizesModels/{}data_64x4_minibatch_{}kIter_contState_actionDist".format(size, int(maxStepNum/1000)))
-	# net.saveVariables(trainedModels[0], "savedModels/iter_60000data_64x4_minibatch_200kIter_contState_actionDist")
 
 
 if __name__ == "__main__":
