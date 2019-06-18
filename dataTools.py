@@ -99,7 +99,7 @@ def generateData(sampleTrajectory, accumulateRewards, policy, actionSpace, trajN
 	return dataSet
 
 
-def generateSymmetricData(originalDataSet):
+def generateSymmetricData(originalDataSet, path):
 	from AnalyticGeometryFunctions import getSymmetricVector
 	from sheepEscapingEnv import actionSpace, xBoundary
 	bias = xBoundary[1]
@@ -114,7 +114,7 @@ def generateSymmetricData(originalDataSet):
 			newActionDistribution = [newActionDistributionDict[action] for action in actionSpace]
 			if np.all(symmetry == np.array([1, 1])):
 				turningPoint = np.array([newState, newActionDistribution, value])
-			newDataSet.append(np.array([newState, newActionDistribution, value]))
+			newDataSet.append(np.array([newState, np.array(newActionDistribution), value]))
 		if turningPoint is None:
 			continue
 		state, actionDistribution, value = turningPoint
@@ -122,9 +122,12 @@ def generateSymmetricData(originalDataSet):
 			newState = np.concatenate([getSymmetricVector(symmetry, np.array(state[0:2])), getSymmetricVector(symmetry, np.array(state[2:4]))])
 			newActionDistributionDict = {tuple(np.round(getSymmetricVector(symmetry, np.array(actionSpace[index])))): actionDistribution[index] for index in range(len(actionDistribution))}
 			newActionDistribution = [newActionDistributionDict[action] for action in actionSpace]
-			newDataSet.append(np.array([newState, newActionDistribution, value]))
-	return newDataSet
-
+			newDataSet.append(np.array([newState, np.array(newActionDistribution), value]))
+	augmentedDataSet = [np.array([np.array([coor + bias if coor < 0 else coor for coor in state]), distribution, value]) for (state, distribution, value) in newDataSet]
+	if path is not None:
+		saveFile = open(path, "wb")
+		pickle.dump(augmentedDataSet, saveFile)
+	return augmentedDataSet
 
 def loadData(path):
 	pklFile = open(path, "rb")
