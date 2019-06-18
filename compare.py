@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import random
 import os
+import pickle
 import policyValueNet as net
 import dataTools
 import sheepEscapingEnv as env
@@ -18,7 +19,7 @@ class ApplyFunction:
 		trainDataSize = df.index.get_level_values('trainingDataSize')[0]
 		trainData =  [list(varData) for varData in zip(*dataSet[:trainDataSize])]
 		testDataSize = df.index.get_level_values('testDataSize')[0]
-		testData = [list(varData) for varData in zip(*dataSet[-testDataSize:])]
+		testData = [list(varData) for varData in zip(*dataSet[:testDataSize])]
 		numStateSpace = df.index.get_level_values('numStateSpace')[0]
 		numActionSpace = df.index.get_level_values('numActionSpace')[0]
 		learningRate = df.index.get_level_values('learningRate')[0]
@@ -43,8 +44,8 @@ class ApplyFunction:
 		generateModel = net.GenerateModelSeparateLastLayer(numStateSpace, numActionSpace, learningRate, regularizationFactor, valueRelativeErrBound=valueRelativeErrBound, seed=tfseed)
 		model = generateModel([neuronsPerLayer] * netLayers)
 		trainedModel = train(model, trainData)
-		modelName = "{}data_{}x{}_minibatch_{}kIter_contState_actionDist".format(trainData, neuronsPerLayer, netLayers,
-		                                                                         maxStepNum / 1000)
+		modelName = "{}data_{}x{}_minibatch_{}kIter_contState_actionDist".format(len(trainData[0]), neuronsPerLayer, netLayers,
+		                                                                         round(maxStepNum / 1000))
 		if self.saveModelDir is not None:
 			savePath = os.path.join(os.getcwd(), self.saveModelDir, modelName)
 			net.saveVariables(trainedModel, savePath)
@@ -56,19 +57,19 @@ def main(seed=128, tfseed=128):
 	random.seed(seed)
 	np.random.seed(4027)
 
-	dataSetPath = "72640steps_1000trajs_sheepEscapingEnv_data_actionDist.pkl"
+	dataSetPath = "Symmetric_72640steps_1000trajs_sheepEscapingEnv_data_actionDist.pkl"
 	dataSet = dataTools.loadData(dataSetPath)
 	random.shuffle(dataSet)
 
-	trainingDataSizes = [100,200]  # [5000, 15000, 30000, 45000, 60000]
-	testDataSize = [100]
+	trainingDataSizes = [len(dataSet)]  # [5000, 15000, 30000, 45000, 60000]
+	testDataSize = [10000]
 	numStateSpace = [env.numStateSpace]
 	numActionSpace = [env.numActionSpace]
 	learningRate = [1e-4]
 	regularizationFactor = [0]
 	valueRelativeErrBound = [0.1]
-	maxStepNum = [100000]
-	batchSize = [100]
+	maxStepNum = [50000]
+	batchSize = [4096]
 	reportInterval = [1000]
 	lossChangeThreshold = [1e-8]
 	lossHistorySize = [10]
@@ -87,9 +88,10 @@ def main(seed=128, tfseed=128):
 	levelIndex = pd.MultiIndex.from_product(levelValues, names=levelNames)
 	toSplitFrame = pd.DataFrame(index=levelIndex)
 
-	applyFunctoin = ApplyFunction()
+	applyFunctoin = ApplyFunction(saveModelDir="./savedModels")
 	resultDF = toSplitFrame.groupby(levelNames).apply(applyFunctoin, dataSet, None, tfseed)
-	print(resultDF)
+	file = open("temp.pkl", "wb")
+	pickle.dump(resultDF, file)
 
 
 if __name__ == "__main__":
